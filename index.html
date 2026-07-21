@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ritmo — Rotina & Bem-estar</title>
+<meta name="theme-color" content="#4C6B57">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Ritmo">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F1F4EE; --card:#FFFFFF; --ink:#26332C; --sub:#6C7A70; --line:#E1E7DD;
+    --moss:#4C6B57; --moss-soft:#E3ECE4;
+    --berry:#A0446B; --berry-soft:#F6E4EC;
+    --sky:#4E7A96; --sky-soft:#E2EDF3;
+    --amber:#A8762E; --amber-soft:#F5EBD9;
+    --lav:#6E6398; --lav-soft:#EAE7F4;
+    --radius:18px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  body{font-family:'Karla',sans-serif; background:var(--bg); color:var(--ink); min-height:100vh; padding-bottom:92px;}
+  h1,h2,h3,.display{font-family:'Fraunces',serif;}
+  button{font-family:inherit; cursor:pointer; border:none; background:none; color:inherit;}
+  input,select,textarea{font-family:inherit; font-size:15px; color:var(--ink); border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff; width:100%;}
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--moss); outline-offset:1px;}
+
+  header{padding:22px 20px 10px; max-width:680px; margin:0 auto;}
+  .eyebrow{font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--moss); font-weight:700;}
+  header h1{font-size:30px; font-weight:600; margin-top:2px;}
+  header .date{color:var(--sub); font-size:14px; margin-top:2px; text-transform:capitalize;}
+
+  .weekstrip{display:flex; gap:6px; margin:14px auto 0; max-width:680px; padding:0 20px;}
+  .weekstrip .d{flex:1; text-align:center; padding:8px 0 9px; border-radius:12px; background:#fff; border:1px solid var(--line); font-size:12px; color:var(--sub);}
+  .weekstrip .d b{display:block; font-size:15px; color:var(--ink); font-family:'Fraunces',serif;}
+  .weekstrip .d.today{background:var(--moss); border-color:var(--moss); color:#DFEADF;}
+  .weekstrip .d.today b{color:#fff;}
+  .weekstrip .d .dot{width:5px;height:5px;border-radius:50%;background:var(--berry);margin:3px auto 0; visibility:hidden;}
+  .weekstrip .d .dot.on{visibility:visible;}
+
+  main{max-width:680px; margin:0 auto; padding:16px 20px 30px;}
+  .tabpage{display:none;}
+  .tabpage.active{display:block; animation:fade .25s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;}}
+
+  .card{background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin-bottom:14px;}
+  .card h2{font-size:19px; font-weight:600; margin-bottom:12px; display:flex; align-items:center; gap:8px;}
+  .chip-ic{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:15px;}
+  .muted{color:var(--sub); font-size:13px;}
+
+  /* Água */
+  .water-row{display:flex; align-items:center; gap:14px;}
+  .water-count{font-family:'Fraunces',serif; font-size:40px; font-weight:600; color:var(--sky); min-width:90px;}
+  .water-count small{font-size:14px; font-family:'Karla',sans-serif; color:var(--sub); font-weight:400;}
+  .roundbtn{width:46px;height:46px;border-radius:50%;font-size:24px;font-weight:700; background:var(--sky-soft); color:var(--sky);}
+  .roundbtn:active{transform:scale(.94);}
+  .cups{display:flex; gap:5px; flex-wrap:wrap; margin-top:10px;}
+  .cup{width:16px;height:22px;border-radius:3px 3px 6px 6px;border:1.5px solid var(--sky);opacity:.25;}
+  .cup.full{background:var(--sky); opacity:1;}
+
+  .list-item{display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--line); font-size:15px;}
+  .list-item:last-child{border-bottom:none;}
+  .list-item .grow{flex:1;}
+  .list-item .del{color:var(--sub); font-size:17px; padding:2px 6px;}
+  .list-item .del:hover{color:var(--berry);}
+  .badge{display:inline-block; font-size:11px; font-weight:700; padding:3px 9px; border-radius:99px; letter-spacing:.02em;}
+
+  .inline-form{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;}
+  .inline-form input, .inline-form select{flex:1; min-width:110px;}
+  .btn{background:var(--moss); color:#fff; font-weight:700; font-size:14px; border-radius:12px; padding:10px 16px;}
+  .btn:active{transform:scale(.97);}
+  .btn.ghost{background:transparent; color:var(--moss); border:1.5px solid var(--moss);}
+  .btn.berry{background:var(--berry);}
+  .btn.small{padding:7px 12px; font-size:13px;}
+
+  .seg{display:flex; gap:6px; flex-wrap:wrap;}
+  .seg button{border:1.5px solid var(--line); border-radius:99px; padding:7px 13px; font-size:13px; font-weight:600; color:var(--sub); background:#fff;}
+  .seg button.on{background:var(--berry-soft); border-color:var(--berry); color:var(--berry);}
+  .seg.moss button.on{background:var(--moss-soft); border-color:var(--moss); color:var(--moss);}
+  .seg.lav button.on{background:var(--lav-soft); border-color:var(--lav); color:var(--lav);}
+
+  /* Tarefas */
+  .task{display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line);}
+  .task:last-child{border-bottom:none;}
+  .task input[type=checkbox]{width:20px;height:20px;accent-color:var(--moss); flex:none;}
+  .task .t{flex:1; font-size:15px;}
+  .task.done .t{text-decoration:line-through; color:var(--sub);}
+
+  .tagrow{display:flex; gap:6px; flex-wrap:wrap; margin:6px 0 12px;}
+  .tag-pill{font-size:12px; font-weight:700; padding:5px 12px; border-radius:99px; border:1.5px solid transparent; background:#fff; color:var(--sub); border-color:var(--line);}
+  .tag-pill.on{color:#fff;}
+
+  .colorpick{display:flex; gap:8px; align-items:center;}
+  .swatch{width:26px;height:26px;border-radius:50%;border:2px solid transparent;}
+  .swatch.on{border-color:var(--ink);}
+
+  /* Agenda */
+  .day-group h3{font-size:15px; color:var(--moss); margin:14px 0 4px; text-transform:capitalize;}
+  .ev{display:flex; gap:10px; align-items:center; padding:9px 0; border-bottom:1px solid var(--line); font-size:15px;}
+  .ev:last-child{border-bottom:none;}
+  .ev .time{font-family:'Fraunces',serif; font-weight:600; color:var(--ink); min-width:52px;}
+
+  /* Medidas */
+  .measure-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px;}
+  .measure-grid .box{background:var(--moss-soft); border-radius:14px; padding:12px; text-align:center;}
+  .measure-grid .box b{display:block; font-family:'Fraunces',serif; font-size:22px; color:var(--moss);}
+  .measure-grid .box span{font-size:11px; color:var(--sub); text-transform:uppercase; letter-spacing:.06em;}
+  .delta{font-size:12px; font-weight:700;}
+  .delta.down{color:var(--moss);} .delta.up{color:var(--berry);}
+
+  table.hist{width:100%; border-collapse:collapse; font-size:13px;}
+  table.hist th{text-align:left; color:var(--sub); font-weight:600; padding:6px 4px; border-bottom:1px solid var(--line);}
+  table.hist td{padding:7px 4px; border-bottom:1px solid var(--line);}
+
+  /* Relatório */
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .stat{border-radius:14px; padding:14px;}
+  .stat b{display:block; font-family:'Fraunces',serif; font-size:24px;}
+  .stat span{font-size:12px; opacity:.85;}
+  .s-sky{background:var(--sky-soft); color:var(--sky);}
+  .s-lav{background:var(--lav-soft); color:var(--lav);}
+  .s-moss{background:var(--moss-soft); color:var(--moss);}
+  .s-amber{background:var(--amber-soft); color:var(--amber);}
+  .s-berry{background:var(--berry-soft); color:var(--berry);}
+
+  nav{position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); display:flex; justify-content:space-around; padding:8px 6px calc(10px + env(safe-area-inset-bottom)); z-index:50;}
+  nav button{display:flex; flex-direction:column; align-items:center; gap:3px; font-size:11px; font-weight:600; color:var(--sub); padding:4px 10px; border-radius:12px;}
+  nav button .ic{font-size:20px;}
+  nav button.on{color:var(--moss); background:var(--moss-soft);}
+
+  .toast{position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:var(--ink); color:#fff; padding:10px 18px; border-radius:99px; font-size:14px; opacity:0; transition:.3s; pointer-events:none; z-index:99;}
+  .toast.show{opacity:1;}
+  .empty{color:var(--sub); font-size:14px; padding:8px 0;}
+  @media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important;} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Seu ritmo semanal</div>
+  <h1>Ritmo</h1>
+  <div class="date" id="todayLabel"></div>
+</header>
+<div class="weekstrip" id="weekstrip"></div>
+
+<main>
+  <!-- ===== HOJE ===== -->
+  <section class="tabpage active" id="page-hoje">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--sky-soft)">💧</span> Água</h2>
+      <div class="water-row">
+        <button class="roundbtn" onclick="changeWater(-1)" aria-label="Remover copo">−</button>
+        <div class="water-count"><span id="waterN">0</span> <small>copos · <span id="waterMl">0</span> ml</small></div>
+        <button class="roundbtn" onclick="changeWater(1)" aria-label="Adicionar copo">+</button>
+      </div>
+      <div class="cups" id="cupsRow"></div>
+      <div class="muted" style="margin-top:8px">1 copo = 250 ml · meta sugerida: 8 copos</div>
+    </div>
+
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--amber-soft)">🍽️</span> Refeições</h2>
+      <div id="mealsList"></div>
+      <div class="inline-form">
+        <select id="mealType">
+          <option>Café da manhã</option><option>Lanche da manhã</option><option>Almoço</option>
+          <option>Lanche da tarde</option><option>Jantar</option><option>Ceia</option>
+        </select>
+        <input id="mealDesc" placeholder="O que você comeu?">
+        <button class="btn" onclick="addMeal()">Registrar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--moss-soft)">🏃‍♀️</span> Atividade física</h2>
+      <div id="actList"></div>
+      <div class="inline-form">
+        <input id="actName" placeholder="Ex: caminhada, musculação…">
+        <input id="actMin" type="number" min="1" placeholder="min" style="max-width:90px">
+        <button class="btn" onclick="addActivity()">Registrar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--lav-soft)">🌙</span> Sono</h2>
+      <div class="inline-form" style="margin-top:0">
+        <input id="sleepH" type="number" step="0.5" min="0" max="24" placeholder="horas dormidas" style="max-width:160px">
+        <button class="btn" onclick="saveSleep()">Salvar</button>
+      </div>
+      <div style="margin-top:12px" class="muted">Qualidade do sono</div>
+      <div class="seg lav" id="sleepQ" style="margin-top:6px">
+        <button data-v="Ruim">Ruim</button><button data-v="Regular">Regular</button>
+        <button data-v="Bom">Bom</button><button data-v="Ótimo">Ótimo</button>
+      </div>
+      <div class="muted" id="sleepInfo" style="margin-top:10px"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--berry-soft)">🌸</span> Ciclo menstrual</h2>
+      <div class="muted">Fluxo de hoje</div>
+      <div class="seg" id="flowSeg" style="margin-top:6px">
+        <button data-v="Nenhum">Nenhum</button><button data-v="Leve">Leve</button>
+        <button data-v="Moderado">Moderado</button><button data-v="Intenso">Intenso</button>
+      </div>
+      <div class="muted" style="margin-top:12px">Sintomas</div>
+      <div class="seg" id="sympSeg" style="margin-top:6px">
+        <button data-v="Cólica">Cólica</button><button data-v="Dor de cabeça">Dor de cabeça</button>
+        <button data-v="Inchaço">Inchaço</button><button data-v="TPM">TPM</button>
+        <button data-v="Cansaço">Cansaço</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== AGENDA ===== -->
+  <section class="tabpage" id="page-agenda">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--moss-soft)">📅</span> Novo compromisso</h2>
+      <div class="tagrow" id="agendaTagPick"></div>
+      <div class="inline-form" style="margin-top:0">
+        <input id="evTitle" placeholder="Título do compromisso" style="flex-basis:100%">
+        <input id="evDate" type="date">
+        <input id="evTime" type="time">
+        <button class="btn" onclick="addEvent()">Adicionar</button>
+      </div>
+      <details style="margin-top:12px">
+        <summary class="muted" style="cursor:pointer">+ Criar novo marcador de agenda</summary>
+        <div class="inline-form">
+          <input id="newAgTag" placeholder="Nome do marcador">
+          <div class="colorpick" id="agColors"></div>
+          <button class="btn small" onclick="createTag('agenda')">Criar</button>
+        </div>
+      </details>
+    </div>
+    <div class="card">
+      <h2>Esta semana</h2>
+      <div id="agendaList"></div>
+    </div>
+  </section>
+
+  <!-- ===== TAREFAS ===== -->
+  <section class="tabpage" id="page-tarefas">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--amber-soft)">✅</span> Nova tarefa</h2>
+      <div class="tagrow" id="taskTagPick"></div>
+      <div class="inline-form" style="margin-top:0">
+        <input id="taskTitle" placeholder="O que precisa ser feito?">
+        <button class="btn" onclick="addTask()">Adicionar</button>
+      </div>
+      <details style="margin-top:12px">
+        <summary class="muted" style="cursor:pointer">+ Criar novo marcador de tarefa</summary>
+        <div class="inline-form">
+          <input id="newTkTag" placeholder="Nome do marcador">
+          <div class="colorpick" id="tkColors"></div>
+          <button class="btn small" onclick="createTag('task')">Criar</button>
+        </div>
+      </details>
+    </div>
+    <div class="card">
+      <h2>Pendentes</h2>
+      <div id="taskListOpen"></div>
+    </div>
+    <div class="card">
+      <h2>Concluídas</h2>
+      <div id="taskListDone"></div>
+    </div>
+  </section>
+
+  <!-- ===== MEDIDAS ===== -->
+  <section class="tabpage" id="page-medidas">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--moss-soft)">⚖️</span> Registro semanal</h2>
+      <div class="measure-grid" id="latestMeasure"></div>
+      <div class="inline-form" style="margin-top:0">
+        <input id="mWeight" type="number" step="0.1" placeholder="Peso (kg)">
+        <input id="mLean" type="number" step="0.1" placeholder="Massa magra (kg)">
+        <input id="mFat" type="number" step="0.1" placeholder="Gordura (%)">
+        <button class="btn" onclick="addMeasure()">Salvar medição</button>
+      </div>
+      <div class="muted" style="margin-top:8px">Registre uma vez por semana para acompanhar a evolução.</div>
+    </div>
+    <div class="card">
+      <h2>Histórico</h2>
+      <table class="hist"><thead><tr><th>Data</th><th>Peso</th><th>M. magra</th><th>Gordura</th><th></th></tr></thead>
+      <tbody id="measureHist"></tbody></table>
+    </div>
+  </section>
+
+  <!-- ===== RELATÓRIO ===== -->
+  <section class="tabpage" id="page-relatorio">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--berry-soft)">📊</span> Relatório dos últimos 7 dias</h2>
+      <div class="muted" id="reportRange" style="margin-bottom:12px"></div>
+      <div class="stat-grid" id="reportStats"></div>
+      <button class="btn berry" style="width:100%; margin-top:16px; padding:14px" onclick="downloadPDF()">Baixar relatório em PDF</button>
+    </div>
+    <div class="card">
+      <h2>Detalhe por dia</h2>
+      <div id="reportDays"></div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-page="hoje" onclick="go('hoje',this)"><span class="ic">🌿</span>Hoje</button>
+  <button data-page="agenda" onclick="go('agenda',this)"><span class="ic">📅</span>Agenda</button>
+  <button data-page="tarefas" onclick="go('tarefas',this)"><span class="ic">✅</span>Tarefas</button>
+  <button data-page="medidas" onclick="go('medidas',this)"><span class="ic">⚖️</span>Medidas</button>
+  <button data-page="relatorio" onclick="go('relatorio',this)"><span class="ic">📊</span>Relatório</button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== Armazenamento local (dados ficam no seu aparelho) ===== */
+window.storage = {
+  async get(k){ const v=localStorage.getItem(k); if(v===null) throw new Error('not found'); return {key:k, value:v}; },
+  async set(k,v){ localStorage.setItem(k,v); return {key:k, value:v}; },
+  async delete(k){ localStorage.removeItem(k); return {key:k, deleted:true}; }
+};
+/* ===== PWA: funciona offline e instala na tela inicial ===== */
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+
+/* ================= Estado & armazenamento ================= */
+const PALETTE = ['#4C6B57','#A0446B','#4E7A96','#A8762E','#6E6398','#B5543B','#3E7C74'];
+let state = {
+  tags: { task:[{id:'t1',name:'Pessoal',color:'#4C6B57'},{id:'t2',name:'Trabalho',color:'#4E7A96'},{id:'t3',name:'Saúde',color:'#A0446B'}],
+          agenda:[{id:'a1',name:'Compromisso',color:'#6E6398'},{id:'a2',name:'Consulta',color:'#A0446B'},{id:'a3',name:'Lazer',color:'#A8762E'}] },
+  tasks: [], events: [], measures: [], days: {}
+};
+let selTaskTag=null, selAgTag=null, selColorAg=PALETTE[0], selColorTk=PALETTE[0];
+
+const todayISO = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const isoOffset = (n) => { const d=new Date(); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+const fmtBR = iso => { const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
+const weekdayName = iso => new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long'});
+const uid = () => Math.random().toString(36).slice(2,9);
+
+function emptyDay(){ return { water:0, meals:[], activities:[], sleep:{hours:null,quality:null}, cycle:{flow:'Nenhum',symptoms:[]} }; }
+function day(iso){ if(!state.days[iso]) state.days[iso]=emptyDay(); return state.days[iso]; }
+
+async function loadKey(key, fallback){
+  try{ const r = await window.storage.get(key); return r ? JSON.parse(r.value) : fallback; }
+  catch(e){ return fallback; }
+}
+async function loadAll(){
+  state.tags     = await loadKey('ritmo:tags', state.tags);
+  state.tasks    = await loadKey('ritmo:tasks', []);
+  state.events   = await loadKey('ritmo:events', []);
+  state.measures = await loadKey('ritmo:measures', []);
+  state.days     = await loadKey('ritmo:days', {});
+}
+let saveTimer=null;
+function persist(part){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async ()=>{
+    try{
+      if(part==='days'||!part)     await window.storage.set('ritmo:days', JSON.stringify(state.days));
+      if(part==='tasks'||!part)    await window.storage.set('ritmo:tasks', JSON.stringify(state.tasks));
+      if(part==='events'||!part)   await window.storage.set('ritmo:events', JSON.stringify(state.events));
+      if(part==='tags'||!part)     await window.storage.set('ritmo:tags', JSON.stringify(state.tags));
+      if(part==='measures'||!part) await window.storage.set('ritmo:measures', JSON.stringify(state.measures));
+    }catch(e){ console.error('Falha ao salvar', e); toast('Não foi possível salvar agora'); }
+  }, 300);
+}
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+
+/* ================= Navegação ================= */
+function go(page, btn){
+  document.querySelectorAll('.tabpage').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('on'));
+  btn.classList.add('on');
+  if(page==='relatorio') renderReport();
+  if(page==='agenda') renderAgenda();
+}
+
+/* ================= Cabeçalho / semana ================= */
+function renderHeader(){
+  const d=new Date();
+  document.getElementById('todayLabel').textContent = d.toLocaleDateString('pt-BR',{weekday:'long', day:'numeric', month:'long'});
+  const strip=document.getElementById('weekstrip'); strip.innerHTML='';
+  const names=['dom','seg','ter','qua','qui','sex','sáb'];
+  for(let i=-6;i<=0;i++){
+    const iso=isoOffset(i); const dt=new Date(iso+'T12:00:00');
+    const dd=state.days[iso];
+    const logged = dd && (dd.water>0 || dd.meals.length || dd.activities.length || dd.sleep.hours!=null);
+    const el=document.createElement('div');
+    el.className='d'+(i===0?' today':'');
+    el.innerHTML=`${names[dt.getDay()]}<b>${dt.getDate()}</b><div class="dot ${logged?'on':''}"></div>`;
+    strip.appendChild(el);
+  }
+}
+
+/* ================= Hoje ================= */
+function changeWater(n){
+  const d=day(todayISO());
+  d.water=Math.max(0, d.water+n);
+  persist('days'); renderToday(); renderHeader();
+}
+function addMeal(){
+  const desc=document.getElementById('mealDesc').value.trim();
+  const type=document.getElementById('mealType').value;
+  if(!desc) return toast('Descreva a refeição');
+  day(todayISO()).meals.push({id:uid(), type, desc, time:new Date().toTimeString().slice(0,5)});
+  document.getElementById('mealDesc').value='';
+  persist('days'); renderToday(); renderHeader();
+}
+function addActivity(){
+  const name=document.getElementById('actName').value.trim();
+  const min=parseInt(document.getElementById('actMin').value);
+  if(!name||!min) return toast('Informe a atividade e a duração');
+  day(todayISO()).activities.push({id:uid(), name, min});
+  document.getElementById('actName').value=''; document.getElementById('actMin').value='';
+  persist('days'); renderToday(); renderHeader();
+}
+function saveSleep(){
+  const h=parseFloat(document.getElementById('sleepH').value);
+  if(isNaN(h)) return toast('Informe as horas de sono');
+  day(todayISO()).sleep.hours=h;
+  persist('days'); renderToday(); renderHeader(); toast('Sono registrado');
+}
+function removeFrom(arr,id,part){ const i=arr.findIndex(x=>x.id===id); if(i>-1) arr.splice(i,1); persist(part); renderToday(); }
+
+function renderToday(){
+  const d=day(todayISO());
+  document.getElementById('waterN').textContent=d.water;
+  document.getElementById('waterMl').textContent=d.water*250;
+  const cups=document.getElementById('cupsRow'); cups.innerHTML='';
+  for(let i=0;i<Math.max(8,d.water);i++){ const c=document.createElement('div'); c.className='cup'+(i<d.water?' full':''); cups.appendChild(c); }
+
+  const ml=document.getElementById('mealsList');
+  ml.innerHTML = d.meals.length? d.meals.map(m=>`
+    <div class="list-item"><div class="grow"><b>${m.type}</b> <span class="muted">${m.time}</span><br>${m.desc}</div>
+    <button class="del" onclick="removeMeal('${m.id}')" aria-label="Excluir">✕</button></div>`).join('') : '<div class="empty">Nenhuma refeição registrada hoje.</div>';
+
+  const al=document.getElementById('actList');
+  al.innerHTML = d.activities.length? d.activities.map(a=>`
+    <div class="list-item"><div class="grow">${a.name} <span class="muted">· ${a.min} min</span></div>
+    <button class="del" onclick="removeAct('${a.id}')" aria-label="Excluir">✕</button></div>`).join('') : '<div class="empty">Nenhuma atividade registrada hoje.</div>';
+
+  document.getElementById('sleepH').value = d.sleep.hours ?? '';
+  document.getElementById('sleepInfo').textContent = d.sleep.hours!=null ? `Registrado: ${d.sleep.hours}h${d.sleep.quality? ' · '+d.sleep.quality:''}` : '';
+  document.querySelectorAll('#sleepQ button').forEach(b=>b.classList.toggle('on', b.dataset.v===d.sleep.quality));
+  document.querySelectorAll('#flowSeg button').forEach(b=>b.classList.toggle('on', b.dataset.v===d.cycle.flow));
+  document.querySelectorAll('#sympSeg button').forEach(b=>b.classList.toggle('on', d.cycle.symptoms.includes(b.dataset.v)));
+}
+function removeMeal(id){ removeFrom(day(todayISO()).meals,id,'days'); renderHeader(); }
+function removeAct(id){ removeFrom(day(todayISO()).activities,id,'days'); renderHeader(); }
+
+document.getElementById('sleepQ').addEventListener('click',e=>{
+  if(e.target.dataset.v){ day(todayISO()).sleep.quality=e.target.dataset.v; persist('days'); renderToday(); }
+});
+document.getElementById('flowSeg').addEventListener('click',e=>{
+  if(e.target.dataset.v){ day(todayISO()).cycle.flow=e.target.dataset.v; persist('days'); renderToday(); }
+});
+document.getElementById('sympSeg').addEventListener('click',e=>{
+  const v=e.target.dataset.v; if(!v) return;
+  const s=day(todayISO()).cycle.symptoms;
+  s.includes(v)? s.splice(s.indexOf(v),1) : s.push(v);
+  persist('days'); renderToday();
+});
+
+/* ================= Marcadores ================= */
+function renderColorPicks(){
+  ['agColors','tkColors'].forEach(idc=>{
+    const el=document.getElementById(idc); el.innerHTML='';
+    PALETTE.forEach(c=>{
+      const b=document.createElement('button'); b.className='swatch'; b.style.background=c;
+      b.setAttribute('aria-label','cor');
+      const sel = idc==='agColors'? selColorAg : selColorTk;
+      if(c===sel) b.classList.add('on');
+      b.onclick=()=>{ if(idc==='agColors') selColorAg=c; else selColorTk=c; renderColorPicks(); };
+      el.appendChild(b);
+    });
+  });
+}
+function createTag(kind){
+  const input = kind==='agenda'? document.getElementById('newAgTag') : document.getElementById('newTkTag');
+  const name=input.value.trim(); if(!name) return toast('Dê um nome ao marcador');
+  state.tags[kind==='agenda'?'agenda':'task'].push({id:uid(), name, color: kind==='agenda'? selColorAg : selColorTk});
+  input.value=''; persist('tags'); renderTagPickers(); toast('Marcador criado');
+}
+function renderTagPickers(){
+  const tk=document.getElementById('taskTagPick'); tk.innerHTML='';
+  state.tags.task.forEach(t=>{
+    const b=document.createElement('button'); b.className='tag-pill'+(selTaskTag===t.id?' on':''); b.textContent=t.name;
+    if(selTaskTag===t.id){ b.style.background=t.color; b.style.borderColor=t.color; }
+    b.onclick=()=>{ selTaskTag = selTaskTag===t.id? null : t.id; renderTagPickers(); };
+    tk.appendChild(b);
+  });
+  const ag=document.getElementById('agendaTagPick'); ag.innerHTML='';
+  state.tags.agenda.forEach(t=>{
+    const b=document.createElement('button'); b.className='tag-pill'+(selAgTag===t.id?' on':''); b.textContent=t.name;
+    if(selAgTag===t.id){ b.style.background=t.color; b.style.borderColor=t.color; }
+    b.onclick=()=>{ selAgTag = selAgTag===t.id? null : t.id; renderTagPickers(); };
+    ag.appendChild(b);
+  });
+}
+const tagOf=(kind,id)=> state.tags[kind].find(t=>t.id===id);
+
+/* ================= Tarefas ================= */
+function addTask(){
+  const title=document.getElementById('taskTitle').value.trim();
+  if(!title) return toast('Escreva a tarefa');
+  state.tasks.push({id:uid(), title, tag:selTaskTag, done:false, created:todayISO(), doneAt:null});
+  document.getElementById('taskTitle').value='';
+  persist('tasks'); renderTasks();
+}
+function toggleTask(id){
+  const t=state.tasks.find(t=>t.id===id); if(!t) return;
+  t.done=!t.done; t.doneAt=t.done? todayISO(): null;
+  persist('tasks'); renderTasks();
+}
+function delTask(id){ state.tasks=state.tasks.filter(t=>t.id!==id); persist('tasks'); renderTasks(); }
+function taskHTML(t){
+  const tag=tagOf('task',t.tag);
+  return `<div class="task ${t.done?'done':''}">
+    <input type="checkbox" ${t.done?'checked':''} onchange="toggleTask('${t.id}')" aria-label="Concluir tarefa">
+    <div class="t">${t.title}${tag?` <span class="badge" style="background:${tag.color}20;color:${tag.color}">${tag.name}</span>`:''}</div>
+    <button class="del" onclick="delTask('${t.id}')" aria-label="Excluir">✕</button></div>`;
+}
+function renderTasks(){
+  const open=state.tasks.filter(t=>!t.done), done=state.tasks.filter(t=>t.done);
+  document.getElementById('taskListOpen').innerHTML = open.length? open.map(taskHTML).join(''):'<div class="empty">Tudo em dia por aqui 🌿</div>';
+  document.getElementById('taskListDone').innerHTML = done.length? done.map(taskHTML).join(''):'<div class="empty">Nenhuma tarefa concluída ainda.</div>';
+}
+
+/* ================= Agenda ================= */
+function addEvent(){
+  const title=document.getElementById('evTitle').value.trim();
+  const date=document.getElementById('evDate').value;
+  const time=document.getElementById('evTime').value;
+  if(!title||!date) return toast('Informe título e data');
+  state.events.push({id:uid(), title, date, time, tag:selAgTag});
+  document.getElementById('evTitle').value='';
+  persist('events'); renderAgenda(); toast('Compromisso adicionado');
+}
+function delEvent(id){ state.events=state.events.filter(e=>e.id!==id); persist('events'); renderAgenda(); }
+function renderAgenda(){
+  const el=document.getElementById('agendaList');
+  const upcoming = state.events.filter(e=>e.date>=isoOffset(-1)).sort((a,b)=> (a.date+a.time).localeCompare(b.date+b.time));
+  if(!upcoming.length){ el.innerHTML='<div class="empty">Nenhum compromisso próximo. Adicione o primeiro acima.</div>'; return; }
+  const byDate={};
+  upcoming.forEach(e=>{ (byDate[e.date]=byDate[e.date]||[]).push(e); });
+  el.innerHTML = Object.keys(byDate).sort().map(date=>{
+    const label = date===todayISO()? 'hoje · '+fmtBR(date) : weekdayName(date)+' · '+fmtBR(date);
+    return `<div class="day-group"><h3>${label}</h3>`+ byDate[date].map(e=>{
+      const tag=tagOf('agenda',e.tag);
+      return `<div class="ev"><span class="time">${e.time||'—'}</span><div class="grow" style="flex:1">${e.title}
+        ${tag?` <span class="badge" style="background:${tag.color}20;color:${tag.color}">${tag.name}</span>`:''}</div>
+        <button class="del" onclick="delEvent('${e.id}')" aria-label="Excluir">✕</button></div>`;
+    }).join('')+'</div>';
+  }).join('');
+}
+
+/* ================= Medidas ================= */
+function addMeasure(){
+  const w=parseFloat(document.getElementById('mWeight').value);
+  const l=parseFloat(document.getElementById('mLean').value);
+  const f=parseFloat(document.getElementById('mFat').value);
+  if(isNaN(w)) return toast('Informe pelo menos o peso');
+  state.measures.push({id:uid(), date:todayISO(), weight:w, lean:isNaN(l)?null:l, fat:isNaN(f)?null:f});
+  state.measures.sort((a,b)=>a.date.localeCompare(b.date));
+  ['mWeight','mLean','mFat'].forEach(i=>document.getElementById(i).value='');
+  persist('measures'); renderMeasures(); toast('Medição salva');
+}
+function delMeasure(id){ state.measures=state.measures.filter(m=>m.id!==id); persist('measures'); renderMeasures(); }
+function renderMeasures(){
+  const latest=state.measures[state.measures.length-1];
+  const prev=state.measures[state.measures.length-2];
+  const grid=document.getElementById('latestMeasure');
+  if(latest){
+    const dW = prev? (latest.weight-prev.weight):null;
+    const dF = (prev&&latest.fat!=null&&prev.fat!=null)? (latest.fat-prev.fat):null;
+    const dL = (prev&&latest.lean!=null&&prev.lean!=null)? (latest.lean-prev.lean):null;
+    const delta=(v,invert)=> v==null? '' : `<div class="delta ${ (invert? v>0:v<0) ?'down':'up'}">${v>0?'+':''}${v.toFixed(1)}</div>`;
+    grid.innerHTML=`
+      <div class="box"><b>${latest.weight.toFixed(1)}</b><span>kg</span>${delta(dW)}</div>
+      <div class="box"><b>${latest.lean!=null?latest.lean.toFixed(1):'—'}</b><span>m. magra kg</span>${delta(dL,true)}</div>
+      <div class="box"><b>${latest.fat!=null?latest.fat.toFixed(1):'—'}</b><span>% gordura</span>${delta(dF)}</div>`;
+  } else grid.innerHTML='<div class="empty" style="grid-column:1/-1">Registre sua primeira medição abaixo.</div>';
+  document.getElementById('measureHist').innerHTML = state.measures.slice().reverse().map(m=>`
+    <tr><td>${fmtBR(m.date)}</td><td>${m.weight.toFixed(1)} kg</td>
+    <td>${m.lean!=null?m.lean.toFixed(1)+' kg':'—'}</td><td>${m.fat!=null?m.fat.toFixed(1)+'%':'—'}</td>
+    <td><button class="del" onclick="delMeasure('${m.id}')" aria-label="Excluir">✕</button></td></tr>`).join('')
+    || '<tr><td colspan="5" class="empty">Sem registros ainda.</td></tr>';
+}
+
+/* ================= Relatório ================= */
+function weekData(){
+  const days=[]; for(let i=-6;i<=0;i++){ const iso=isoOffset(i); days.push({iso, d: state.days[iso]||emptyDay()}); }
+  const logged = days.filter(x=> x.d.water>0||x.d.meals.length||x.d.activities.length||x.d.sleep.hours!=null);
+  const waterAvg = days.reduce((s,x)=>s+x.d.water,0)/7;
+  const sleepVals = days.filter(x=>x.d.sleep.hours!=null).map(x=>x.d.sleep.hours);
+  const sleepAvg = sleepVals.length? sleepVals.reduce((a,b)=>a+b,0)/sleepVals.length : null;
+  const actMin = days.reduce((s,x)=>s+x.d.activities.reduce((a,b)=>a+b.min,0),0);
+  const actDays = days.filter(x=>x.d.activities.length).length;
+  const meals = days.reduce((s,x)=>s+x.d.meals.length,0);
+  const flowDays = days.filter(x=>x.d.cycle.flow && x.d.cycle.flow!=='Nenhum').length;
+  const tasksDone = state.tasks.filter(t=>t.done && t.doneAt>=isoOffset(-6)).length;
+  const eventsWeek = state.events.filter(e=> e.date>=isoOffset(-6) && e.date<=todayISO()).length;
+  return {days, logged:logged.length, waterAvg, sleepAvg, actMin, actDays, meals, flowDays, tasksDone, eventsWeek};
+}
+function renderReport(){
+  const w=weekData();
+  document.getElementById('reportRange').textContent = `Período: ${fmtBR(isoOffset(-6))} a ${fmtBR(todayISO())} · ${w.logged} de 7 dias com registros`;
+  const latest=state.measures[state.measures.length-1];
+  document.getElementById('reportStats').innerHTML=`
+    <div class="stat s-sky"><b>${w.waterAvg.toFixed(1)}</b><span>copos de água / dia (média)</span></div>
+    <div class="stat s-lav"><b>${w.sleepAvg!=null? w.sleepAvg.toFixed(1)+'h':'—'}</b><span>sono médio por noite</span></div>
+    <div class="stat s-moss"><b>${w.actMin} min</b><span>atividade física · ${w.actDays} dia(s) ativos</span></div>
+    <div class="stat s-amber"><b>${w.meals}</b><span>refeições registradas</span></div>
+    <div class="stat s-berry"><b>${w.flowDays}</b><span>dia(s) de fluxo menstrual</span></div>
+    <div class="stat s-moss"><b>${w.tasksDone}</b><span>tarefas concluídas na semana</span></div>
+    ${latest? `<div class="stat s-moss" style="grid-column:1/-1"><b>${latest.weight.toFixed(1)} kg</b>
+      <span>última medição (${fmtBR(latest.date)}) · m. magra ${latest.lean!=null?latest.lean.toFixed(1)+' kg':'—'} · gordura ${latest.fat!=null?latest.fat.toFixed(1)+'%':'—'}</span></div>`:''}`;
+  document.getElementById('reportDays').innerHTML = w.days.map(({iso,d})=>`
+    <div class="list-item"><div class="grow">
+      <b style="text-transform:capitalize">${weekdayName(iso)} · ${fmtBR(iso)}</b><br>
+      <span class="muted">💧 ${d.water} copos · 🍽️ ${d.meals.length} refeições · 🏃‍♀️ ${d.activities.reduce((a,b)=>a+b.min,0)} min
+      · 🌙 ${d.sleep.hours!=null? d.sleep.hours+'h':'—'} · 🌸 ${d.cycle.flow||'Nenhum'}</span>
+    </div></div>`).join('');
+}
+
+function downloadPDF(){
+  try{
+    const { jsPDF } = window.jspdf;
+    const doc=new jsPDF();
+    const w=weekData();
+    const M=18; let y=22;
+    const moss=[76,107,87], berry=[160,68,107], ink=[38,51,44], sub=[108,122,112];
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...moss);
+    doc.text('Ritmo — Relatório semanal', M, y); y+=8;
+    doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...sub);
+    doc.text(`Período: ${fmtBR(isoOffset(-6))} a ${fmtBR(todayISO())}`, M, y); y+=10;
+    doc.setDrawColor(...moss); doc.setLineWidth(.6); doc.line(M,y,192,y); y+=10;
+
+    const section=(title)=>{ doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...ink); doc.text(title,M,y); y+=7; doc.setFont('helvetica','normal'); doc.setFontSize(11); };
+    const row=(label,val)=>{ doc.setTextColor(...sub); doc.text(label,M,y); doc.setTextColor(...ink); doc.text(String(val),110,y); y+=6.5; };
+
+    section('Resumo da semana');
+    row('Hidratação (média diária)', `${w.waterAvg.toFixed(1)} copos (~${Math.round(w.waterAvg*250)} ml)`);
+    row('Sono médio por noite', w.sleepAvg!=null? `${w.sleepAvg.toFixed(1)} horas`:'sem registros');
+    row('Atividade física', `${w.actMin} min em ${w.actDays} dia(s)`);
+    row('Refeições registradas', w.meals);
+    row('Dias de fluxo menstrual', w.flowDays);
+    row('Tarefas concluídas', w.tasksDone);
+    row('Compromissos na semana', w.eventsWeek);
+    y+=4;
+
+    section('Peso e composição corporal');
+    const latest=state.measures[state.measures.length-1];
+    const prev=state.measures[state.measures.length-2];
+    if(latest){
+      row('Peso atual', `${latest.weight.toFixed(1)} kg` + (prev? ` (${latest.weight-prev.weight>=0?'+':''}${(latest.weight-prev.weight).toFixed(1)} kg vs anterior)`:''));
+      row('Massa magra', latest.lean!=null? `${latest.lean.toFixed(1)} kg`:'—');
+      row('Percentual de gordura', latest.fat!=null? `${latest.fat.toFixed(1)}%`:'—');
+      row('Data da medição', fmtBR(latest.date));
+    } else { doc.setTextColor(...sub); doc.text('Nenhuma medição registrada.',M,y); y+=6.5; }
+    y+=4;
+
+    section('Detalhe por dia');
+    doc.setFontSize(9.5);
+    doc.setTextColor(...sub);
+    doc.text('Dia',M,y); doc.text('Água',60,y); doc.text('Refeições',80,y); doc.text('Atividade',106,y); doc.text('Sono',134,y); doc.text('Ciclo',154,y); y+=2;
+    doc.setDrawColor(225,231,221); doc.line(M,y,192,y); y+=5;
+    doc.setTextColor(...ink);
+    w.days.forEach(({iso,d})=>{
+      if(y>270){ doc.addPage(); y=20; }
+      doc.text(fmtBR(iso),M,y);
+      doc.text(`${d.water}`,60,y);
+      doc.text(`${d.meals.length}`,80,y);
+      doc.text(`${d.activities.reduce((a,b)=>a+b.min,0)} min`,106,y);
+      doc.text(d.sleep.hours!=null? `${d.sleep.hours}h`:'—',134,y);
+      doc.setTextColor(...(d.cycle.flow!=='Nenhum'? berry: ink));
+      doc.text(d.cycle.flow||'—',154,y);
+      doc.setTextColor(...ink);
+      y+=6;
+    });
+    y+=6;
+    doc.setFontSize(9); doc.setTextColor(...sub);
+    doc.text('Gerado pelo app Ritmo — bem-estar e qualidade de vida.', M, 288);
+
+    doc.save(`relatorio-ritmo-${todayISO()}.pdf`);
+    toast('PDF gerado!');
+  }catch(e){ console.error(e); toast('Erro ao gerar o PDF'); }
+}
+
+/* ================= Inicialização ================= */
+(async function init(){
+  await loadAll();
+  document.getElementById('evDate').value=todayISO();
+  renderHeader(); renderToday(); renderTagPickers(); renderColorPicks();
+  renderTasks(); renderAgenda(); renderMeasures();
+})();
+</script>
+</body>
+</html>
