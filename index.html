@@ -87,6 +87,7 @@
   .seg button.on{background:var(--berry-soft); border-color:var(--berry); color:var(--berry);}
   .seg.moss button.on{background:var(--moss-soft); border-color:var(--moss); color:var(--moss);}
   .seg.lav button.on{background:var(--lav-soft); border-color:var(--lav); color:var(--lav);}
+  .seg.amber button.on{background:var(--amber-soft); border-color:var(--amber); color:var(--amber);}
 
   /* Tarefas */
   .task{display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--line);}
@@ -324,6 +325,46 @@
     </div>
   </section>
 
+  <!-- ===== GASTOS ===== -->
+  <section class="tabpage" id="page-gastos">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--amber-soft)">💰</span> Novo gasto</h2>
+      <div class="inline-form" style="margin-top:0">
+        <input id="expValue" type="number" step="0.01" min="0" placeholder="Valor (R$)" style="max-width:140px">
+        <select id="expCategory"></select>
+      </div>
+      <div class="muted" style="margin-top:12px">Tipo de gasto</div>
+      <div class="seg amber" id="expTypeSeg" style="margin-top:6px">
+        <button data-v="Fixo">Fixo</button><button data-v="Variável" class="on">Variável</button>
+      </div>
+      <div class="inline-form">
+        <input id="expDesc" placeholder="Descrição (opcional)" style="flex-basis:100%">
+        <button class="btn" onclick="addExpense()">Registrar gasto</button>
+      </div>
+      <details style="margin-top:12px">
+        <summary class="muted" style="cursor:pointer">+ Criar ou gerenciar categorias</summary>
+        <div class="inline-form">
+          <input id="newExpCat" placeholder="Nome da categoria">
+          <button class="btn small" onclick="createExpenseCategory()">Criar</button>
+        </div>
+        <div id="expCatManage" style="margin-top:8px"></div>
+      </details>
+    </div>
+    <div class="card">
+      <h2>Resumo do mês</h2>
+      <div class="stat-grid" id="expMonthStats"></div>
+    </div>
+    <div class="card">
+      <h2>Gastos de hoje</h2>
+      <div id="expTodayList"></div>
+    </div>
+    <div class="card">
+      <h2>Histórico</h2>
+      <div class="muted" style="margin-bottom:6px">Últimos lançamentos, do mais recente ao mais antigo.</div>
+      <div id="expHistList"></div>
+    </div>
+  </section>
+
   <!-- ===== CICLO ===== -->
   <section class="tabpage" id="page-ciclo">
     <div class="card">
@@ -391,6 +432,7 @@
   <button data-page="agenda" onclick="go('agenda',this)"><span class="ic">📅</span>Agenda</button>
   <button data-page="tarefas" onclick="go('tarefas',this)"><span class="ic">✅</span>Tarefas</button>
   <button data-page="diario" onclick="go('diario',this)"><span class="ic">📖</span>Diário</button>
+  <button data-page="gastos" onclick="go('gastos',this)"><span class="ic">💰</span>Gastos</button>
   <button data-page="ciclo" onclick="go('ciclo',this)"><span class="ic">🌸</span>Ciclo</button>
   <button data-page="medidas" onclick="go('medidas',this)"><span class="ic">⚖️</span>Medidas</button>
   <button data-page="relatorio" onclick="go('relatorio',this)"><span class="ic">📊</span>Relatório</button>
@@ -455,6 +497,8 @@ function applyRemoteChange(key, value){
     else if(key==='ritmo:events'){ state.events=parsed; renderAgenda(); }
     else if(key==='ritmo:tags'){ state.tags=parsed; renderTagPickers(); }
     else if(key==='ritmo:measures'){ state.measures=parsed; renderMeasures(); }
+    else if(key==='ritmo:expenses'){ state.expenses=parsed; if(document.getElementById('page-gastos').classList.contains('active')) renderGastos(); if(document.getElementById('page-relatorio').classList.contains('active')) renderReport(); }
+    else if(key==='ritmo:expenseCategories'){ state.expenseCategories=parsed; renderExpenseCategorySelect(); renderExpenseCategoryManage(); }
   }catch(e){ console.error('Falha ao aplicar atualização remota', e); }
 }
 function subscribeRealtime(){
@@ -483,9 +527,17 @@ const PALETTE = ['#4C6B57','#A0446B','#4E7A96','#A8762E','#6E6398','#B5543B','#3
 let state = {
   tags: { task:[{id:'t1',name:'Pessoal',color:'#4C6B57'},{id:'t2',name:'Trabalho',color:'#4E7A96'},{id:'t3',name:'Saúde',color:'#A0446B'}],
           agenda:[{id:'a1',name:'Compromisso',color:'#6E6398'},{id:'a2',name:'Consulta',color:'#A0446B'},{id:'a3',name:'Lazer',color:'#A8762E'}] },
-  tasks: [], events: [], measures: [], days: {}
+  expenseCategories: [
+    {id:'e1',name:'Alimentação',color:'#A8762E'},
+    {id:'e2',name:'Carro',color:'#4E7A96'},
+    {id:'e3',name:'Roupa',color:'#6E6398'},
+    {id:'e4',name:'Contas fixas',color:'#A0446B'},
+    {id:'e5',name:'Lazer',color:'#3E7C74'},
+    {id:'e6',name:'Saúde',color:'#4C6B57'}
+  ],
+  tasks: [], events: [], measures: [], expenses: [], days: {}
 };
-let selTaskTag=null, selAgTag=null, selColorAg=PALETTE[0], selColorTk=PALETTE[0];
+let selTaskTag=null, selAgTag=null, selColorAg=PALETTE[0], selColorTk=PALETTE[0], selExpType='Variável';
 
 const todayISO = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const isoOffset = (n) => { const d=new Date(); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
@@ -502,9 +554,11 @@ async function loadKey(key, fallback){
 }
 async function loadAll(){
   state.tags     = await loadKey('ritmo:tags', state.tags);
+  state.expenseCategories = await loadKey('ritmo:expenseCategories', state.expenseCategories);
   state.tasks    = await loadKey('ritmo:tasks', []);
   state.events   = await loadKey('ritmo:events', []);
   state.measures = await loadKey('ritmo:measures', []);
+  state.expenses = await loadKey('ritmo:expenses', []);
   state.days     = await loadKey('ritmo:days', {});
 }
 let saveTimer=null;
@@ -517,6 +571,8 @@ function persist(part){
       if(part==='events'||!part)   await window.storage.set('ritmo:events', JSON.stringify(state.events));
       if(part==='tags'||!part)     await window.storage.set('ritmo:tags', JSON.stringify(state.tags));
       if(part==='measures'||!part) await window.storage.set('ritmo:measures', JSON.stringify(state.measures));
+      if(part==='expenses'||!part) await window.storage.set('ritmo:expenses', JSON.stringify(state.expenses));
+      if(part==='expenseCategories'||!part) await window.storage.set('ritmo:expenseCategories', JSON.stringify(state.expenseCategories));
     }catch(e){ console.error('Falha ao salvar', e); toast('Não foi possível salvar agora'); }
   }, 300);
 }
@@ -532,6 +588,7 @@ function go(page, btn){
   if(page==='relatorio') renderReport();
   if(page==='agenda') renderAgenda();
   if(page==='diario') renderDiario();
+  if(page==='gastos') renderGastos();
   if(page==='ciclo') renderCycleCalendar();
 }
 
@@ -884,6 +941,100 @@ function renderDiario(){
   }).join('');
 }
 
+/* ================= Gastos ================= */
+function typeBadge(t){
+  return t==='Fixo'
+    ? `<span class="badge" style="background:var(--berry-soft);color:var(--berry)">Fixo</span>`
+    : `<span class="badge" style="background:var(--sky-soft);color:var(--sky)">Variável</span>`;
+}
+function expCategoryOf(id){ return state.expenseCategories.find(c=>c.id===id); }
+function renderExpenseCategorySelect(){
+  const sel=document.getElementById('expCategory'); if(!sel) return;
+  const cur=sel.value;
+  sel.innerHTML = state.expenseCategories.map(c=>`<option value="${c.id}">${c.name}</option>`).join('');
+  if(cur && state.expenseCategories.some(c=>c.id===cur)) sel.value=cur;
+}
+function createExpenseCategory(){
+  const input=document.getElementById('newExpCat');
+  const name=input.value.trim(); if(!name) return toast('Dê um nome à categoria');
+  const color = PALETTE[state.expenseCategories.length % PALETTE.length];
+  state.expenseCategories.push({id:uid(), name, color});
+  input.value='';
+  persist('expenseCategories'); renderExpenseCategorySelect(); renderExpenseCategoryManage();
+  toast('Categoria criada');
+}
+function renderExpenseCategoryManage(){
+  const el=document.getElementById('expCatManage'); if(!el) return;
+  el.innerHTML = state.expenseCategories.length? state.expenseCategories.map(c=>`
+    <div class="list-item"><div class="grow"><span class="badge" style="background:${c.color}20;color:${c.color}">${c.name}</span></div>
+    <button class="del" onclick="deleteExpenseCategory('${c.id}')" aria-label="Excluir categoria">✕</button></div>`).join('')
+    : '<div class="empty">Nenhuma categoria criada ainda.</div>';
+}
+function deleteExpenseCategory(id){
+  if(state.expenseCategories.length<=1) return toast('Mantenha ao menos uma categoria');
+  state.expenseCategories=state.expenseCategories.filter(c=>c.id!==id);
+  state.expenses.forEach(e=>{ if(e.category===id) e.category=null; });
+  persist('expenseCategories'); persist('expenses');
+  renderExpenseCategorySelect(); renderExpenseCategoryManage(); renderGastos();
+  toast('Categoria excluída');
+}
+document.getElementById('expTypeSeg').addEventListener('click', e=>{
+  const v=e.target.dataset.v; if(!v) return;
+  selExpType=v;
+  document.querySelectorAll('#expTypeSeg button').forEach(b=>b.classList.toggle('on', b.dataset.v===v));
+});
+function addExpense(){
+  const value=parseFloat(document.getElementById('expValue').value);
+  const category=document.getElementById('expCategory').value;
+  const desc=document.getElementById('expDesc').value.trim();
+  if(isNaN(value)||value<=0) return toast('Informe o valor do gasto');
+  if(!category) return toast('Escolha uma categoria');
+  state.expenses.push({id:uid(), date:todayISO(), value, category, type:selExpType, desc});
+  document.getElementById('expValue').value=''; document.getElementById('expDesc').value='';
+  persist('expenses'); renderGastos();
+  toast('Gasto registrado');
+}
+function delExpense(id){ state.expenses=state.expenses.filter(e=>e.id!==id); persist('expenses'); renderGastos(); }
+function expenseHTML(e){
+  const c=expCategoryOf(e.category);
+  return `<div class="list-item"><div class="grow">
+    <b>R$ ${e.value.toFixed(2)}</b> ${c?`<span class="badge" style="background:${c.color}20;color:${c.color}">${c.name}</span>`:''} ${typeBadge(e.type)}
+    ${e.desc?`<br><span class="muted">${e.desc}</span>`:''}
+    </div><button class="del" onclick="delExpense('${e.id}')" aria-label="Excluir">✕</button></div>`;
+}
+function dayExpenseTotal(iso){ return state.expenses.filter(e=>e.date===iso).reduce((s,e)=>s+e.value,0); }
+function renderGastos(){
+  renderExpenseCategorySelect(); renderExpenseCategoryManage();
+  const today=todayISO();
+  const todays=state.expenses.filter(e=>e.date===today);
+  document.getElementById('expTodayList').innerHTML = todays.length
+    ? todays.slice().reverse().map(expenseHTML).join('')
+    : '<div class="empty">Nenhum gasto registrado hoje.</div>';
+
+  const monthPrefix=today.slice(0,7);
+  const monthExp=state.expenses.filter(e=>e.date.startsWith(monthPrefix));
+  const totalMonth=monthExp.reduce((s,e)=>s+e.value,0);
+  const fixedMonth=monthExp.filter(e=>e.type==='Fixo').reduce((s,e)=>s+e.value,0);
+  const varMonth=monthExp.filter(e=>e.type==='Variável').reduce((s,e)=>s+e.value,0);
+  document.getElementById('expMonthStats').innerHTML=`
+    <div class="stat s-amber"><b>R$ ${totalMonth.toFixed(2)}</b><span>total do mês</span></div>
+    <div class="stat s-berry"><b>R$ ${fixedMonth.toFixed(2)}</b><span>gastos fixos</span></div>
+    <div class="stat s-sky"><b>R$ ${varMonth.toFixed(2)}</b><span>gastos variáveis</span></div>
+    <div class="stat s-moss"><b>${monthExp.length}</b><span>lançamento(s) no mês</span></div>`;
+
+  const hist=state.expenses.slice().sort((a,b)=> (b.date+b.id).localeCompare(a.date+a.id)).slice(0,40);
+  document.getElementById('expHistList').innerHTML = hist.length
+    ? hist.map(e=>{
+        const c=expCategoryOf(e.category);
+        return `<div class="list-item"><div class="grow">
+          <span class="muted">${fmtBR(e.date)}</span> · <b>R$ ${e.value.toFixed(2)}</b>
+          ${c?`<span class="badge" style="background:${c.color}20;color:${c.color}">${c.name}</span>`:''} ${typeBadge(e.type)}
+          ${e.desc?`<br>${e.desc}`:''}
+          </div><button class="del" onclick="delExpense('${e.id}')" aria-label="Excluir">✕</button></div>`;
+      }).join('')
+    : '<div class="empty">Nenhum gasto registrado ainda.</div>';
+}
+
 /* ================= Relatório ================= */
 function weekData(){
   const days=[]; for(let i=-6;i<=0;i++){ const iso=isoOffset(i); days.push({iso, d: state.days[iso]||emptyDay()}); }
@@ -897,7 +1048,17 @@ function weekData(){
   const flowDays = days.filter(x=>x.d.cycle.flow && x.d.cycle.flow!=='Nenhum').length;
   const tasksDone = state.tasks.filter(t=>t.done && t.doneAt>=isoOffset(-6)).length;
   const eventsWeek = state.events.filter(e=> e.date>=isoOffset(-6) && e.date<=todayISO()).length;
-  return {days, logged:logged.length, waterAvg, sleepAvg, actMin, actDays, meals, flowDays, tasksDone, eventsWeek};
+  const weekExp = state.expenses.filter(e=> e.date>=isoOffset(-6) && e.date<=todayISO());
+  const expTotal = weekExp.reduce((s,e)=>s+e.value,0);
+  const expFixed = weekExp.filter(e=>e.type==='Fixo').reduce((s,e)=>s+e.value,0);
+  const expVar = weekExp.filter(e=>e.type==='Variável').reduce((s,e)=>s+e.value,0);
+  const catTotals={};
+  weekExp.forEach(e=>{ catTotals[e.category]=(catTotals[e.category]||0)+e.value; });
+  const topCatId = Object.keys(catTotals).sort((a,b)=>catTotals[b]-catTotals[a])[0];
+  const topCat = topCatId ? expCategoryOf(topCatId) : null;
+  const topCatVal = topCatId ? catTotals[topCatId] : 0;
+  return {days, logged:logged.length, waterAvg, sleepAvg, actMin, actDays, meals, flowDays, tasksDone, eventsWeek,
+    expTotal, expFixed, expVar, topCat, topCatVal};
 }
 function renderReport(){
   const w=weekData();
@@ -910,13 +1071,17 @@ function renderReport(){
     <div class="stat s-amber"><b>${w.meals}</b><span>refeições registradas</span></div>
     <div class="stat s-berry"><b>${w.flowDays}</b><span>dia(s) de fluxo menstrual</span></div>
     <div class="stat s-moss"><b>${w.tasksDone}</b><span>tarefas concluídas na semana</span></div>
+    <div class="stat s-amber"><b>R$ ${w.expTotal.toFixed(2)}</b><span>gastos na semana</span></div>
+    <div class="stat s-berry"><b>R$ ${w.expFixed.toFixed(2)}</b><span>gastos fixos</span></div>
+    <div class="stat s-sky"><b>R$ ${w.expVar.toFixed(2)}</b><span>gastos variáveis</span></div>
+    ${w.topCat? `<div class="stat s-moss"><b>${w.topCat.name}</b><span>categoria com mais gastos (R$ ${w.topCatVal.toFixed(2)})</span></div>`:''}
     ${latest? `<div class="stat s-moss" style="grid-column:1/-1"><b>${latest.weight.toFixed(1)} kg</b>
       <span>última medição (${fmtBR(latest.date)}) · m. magra ${latest.lean!=null?latest.lean.toFixed(1)+' kg':'—'} · gordura ${latest.fat!=null?latest.fat.toFixed(1)+'%':'—'}</span></div>`:''}`;
   document.getElementById('reportDays').innerHTML = w.days.map(({iso,d})=>`
     <div class="list-item"><div class="grow">
       <b style="text-transform:capitalize">${weekdayName(iso)} · ${fmtBR(iso)}</b><br>
       <span class="muted">💧 ${d.water} copos · 🍽️ ${d.meals.length} refeições · 🏃‍♀️ ${d.activities.reduce((a,b)=>a+b.min,0)} min
-      · 🌙 ${d.sleep.hours!=null? d.sleep.hours+'h':'—'} · 🌸 ${d.cycle.flow||'Nenhum'}</span>
+      · 🌙 ${d.sleep.hours!=null? d.sleep.hours+'h':'—'} · 🌸 ${d.cycle.flow||'Nenhum'} · 💰 R$ ${dayExpenseTotal(iso).toFixed(2)}</span>
     </div></div>`).join('');
 }
 
@@ -945,6 +1110,13 @@ function downloadPDF(){
     row('Dias de fluxo menstrual', w.flowDays);
     row('Tarefas concluídas', w.tasksDone);
     row('Compromissos na semana', w.eventsWeek);
+    y+=4;
+
+    section('Gastos financeiros');
+    row('Total de gastos na semana', `R$ ${w.expTotal.toFixed(2)}`);
+    row('Gastos fixos', `R$ ${w.expFixed.toFixed(2)}`);
+    row('Gastos variáveis', `R$ ${w.expVar.toFixed(2)}`);
+    row('Categoria com mais gastos', w.topCat? `${w.topCat.name} (R$ ${w.topCatVal.toFixed(2)})` : 'sem registros');
     y+=4;
 
     section('Peso e composição corporal');
@@ -991,7 +1163,7 @@ function downloadPDF(){
   await loadAll();
   document.getElementById('evDate').value=todayISO();
   renderHeader(); renderToday(); renderTagPickers(); renderColorPicks();
-  renderTasks(); renderAgenda(); renderMeasures();
+  renderTasks(); renderAgenda(); renderMeasures(); renderExpenseCategorySelect(); renderExpenseCategoryManage();
   subscribeRealtime();
   pingCloud();
 })();
