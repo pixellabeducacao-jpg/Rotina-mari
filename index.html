@@ -156,7 +156,7 @@
   .s-berry{background:var(--berry-soft); color:var(--berry);}
 
   nav{position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid var(--line); display:flex; justify-content:space-around; padding:8px 3px calc(10px + env(safe-area-inset-bottom)); z-index:50;}
-  nav button{display:flex; flex-direction:column; align-items:center; gap:3px; font-size:10px; font-weight:600; color:var(--sub); padding:4px 5px; border-radius:12px;}
+  nav button{display:flex; flex-direction:column; align-items:center; gap:3px; font-size:9.5px; font-weight:600; color:var(--sub); padding:4px 3px; border-radius:12px;}
   nav button .ic{font-size:18px;}
   nav button.on{color:var(--moss); background:var(--moss-soft);}
 
@@ -388,6 +388,47 @@
     </div>
   </section>
 
+  <!-- ===== GASTOS ===== -->
+  <section class="tabpage" id="page-gastos">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--amber-soft)">💸</span> Novo gasto</h2>
+      <div class="tagrow" id="expCatPick"></div>
+      <div class="inline-form" style="margin-top:0">
+        <input id="expAmount" type="number" step="0.01" min="0" placeholder="Valor (R$)">
+        <input id="expDate" type="date">
+        <input id="expDesc" placeholder="Descrição (opcional)" style="flex-basis:100%">
+      </div>
+      <div class="seg" id="expTypeSeg" style="margin-top:10px">
+        <button data-v="Fixo">Fixo</button>
+        <button data-v="Variável" class="on">Variável</button>
+      </div>
+      <button class="btn" style="width:100%; margin-top:12px" onclick="addExpense()">Adicionar gasto</button>
+      <details style="margin-top:12px">
+        <summary class="muted" style="cursor:pointer">+ Criar ou gerenciar categorias</summary>
+        <div class="inline-form">
+          <input id="newExpCat" placeholder="Nome da categoria">
+          <div class="colorpick" id="expColors"></div>
+          <button class="btn small" onclick="createExpenseCat()">Criar</button>
+        </div>
+        <div id="expCatManage" style="margin-top:8px"></div>
+      </details>
+    </div>
+    <div class="card">
+      <h2>Resumo do mês</h2>
+      <div class="cyc-nav">
+        <button onclick="prevExpMonth()">‹</button>
+        <div class="lbl" id="expMonthLabel"></div>
+        <button onclick="nextExpMonth()">›</button>
+      </div>
+      <div class="stat-grid" id="expSummary" style="margin-top:10px"></div>
+      <div id="expByCategory" style="margin-top:14px"></div>
+    </div>
+    <div class="card">
+      <h2>Histórico</h2>
+      <div id="expenseHistory"></div>
+    </div>
+  </section>
+
   <!-- ===== RELATÓRIO ===== -->
   <section class="tabpage" id="page-relatorio">
     <div class="card">
@@ -395,6 +436,10 @@
       <div class="muted" id="reportRange" style="margin-bottom:12px"></div>
       <div class="stat-grid" id="reportStats"></div>
       <button class="btn berry" style="width:100%; margin-top:16px; padding:14px" onclick="downloadPDF()">Baixar relatório em PDF</button>
+    </div>
+    <div class="card">
+      <h2>Gastos por categoria (7 dias)</h2>
+      <div id="reportSpendByCat"></div>
     </div>
     <div class="card">
       <h2>Detalhe por dia</h2>
@@ -410,6 +455,7 @@
   <button data-page="diario" onclick="go('diario',this)"><span class="ic">📖</span>Diário</button>
   <button data-page="ciclo" onclick="go('ciclo',this)"><span class="ic">🌸</span>Ciclo</button>
   <button data-page="medidas" onclick="go('medidas',this)"><span class="ic">⚖️</span>Medidas</button>
+  <button data-page="gastos" onclick="go('gastos',this)"><span class="ic">💸</span>Gastos</button>
   <button data-page="relatorio" onclick="go('relatorio',this)"><span class="ic">📊</span>Relatório</button>
 </nav>
 
@@ -472,6 +518,8 @@ function applyRemoteChange(key, value){
     else if(key==='ritmo:events'){ state.events=parsed; renderAgenda(); }
     else if(key==='ritmo:tags'){ state.tags=parsed; renderTagPickers(); }
     else if(key==='ritmo:measures'){ state.measures=parsed; renderMeasures(); }
+    else if(key==='ritmo:expenses'){ state.expenses=parsed; if(document.getElementById('page-gastos').classList.contains('active')) renderExpenses(); if(document.getElementById('page-relatorio').classList.contains('active')) renderReport(); }
+    else if(key==='ritmo:expenseCats'){ state.expenseCats=parsed; if(document.getElementById('page-gastos').classList.contains('active')) renderExpenses(); }
   }catch(e){ console.error('Falha ao aplicar atualização remota', e); }
 }
 function subscribeRealtime(){
@@ -500,9 +548,17 @@ const PALETTE = ['#4C6B57','#A0446B','#4E7A96','#A8762E','#6E6398','#B5543B','#3
 let state = {
   tags: { task:[{id:'t1',name:'Pessoal',color:'#4C6B57'},{id:'t2',name:'Trabalho',color:'#4E7A96'},{id:'t3',name:'Saúde',color:'#A0446B'}],
           agenda:[{id:'a1',name:'Compromisso',color:'#6E6398'},{id:'a2',name:'Consulta',color:'#A0446B'},{id:'a3',name:'Lazer',color:'#A8762E'}] },
-  tasks: [], events: [], measures: [], days: {}
+  expenseCats: [
+    {id:'e1',name:'Alimentação',color:'#A8762E'},
+    {id:'e2',name:'Carro',color:'#4E7A96'},
+    {id:'e3',name:'Roupa',color:'#A0446B'},
+    {id:'e4',name:'Contas fixas',color:'#B5543B'},
+    {id:'e5',name:'Lazer',color:'#6E6398'},
+    {id:'e6',name:'Saúde',color:'#3E7C74'}
+  ],
+  tasks: [], events: [], measures: [], expenses: [], days: {}
 };
-let selTaskTag=null, selAgTag=null, selColorAg=PALETTE[0], selColorTk=PALETTE[0];
+let selTaskTag=null, selAgTag=null, selExpCat=null, selColorAg=PALETTE[0], selColorTk=PALETTE[0], selColorExp=PALETTE[0], selExpType='Variável';
 
 const todayISO = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
 const isoOffset = (n) => { const d=new Date(); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
@@ -522,6 +578,8 @@ async function loadAll(){
   state.tasks    = await loadKey('ritmo:tasks', []);
   state.events   = await loadKey('ritmo:events', []);
   state.measures = await loadKey('ritmo:measures', []);
+  state.expenseCats = await loadKey('ritmo:expenseCats', state.expenseCats);
+  state.expenses = await loadKey('ritmo:expenses', []);
   state.days     = await loadKey('ritmo:days', {});
 }
 let saveTimer=null;
@@ -534,6 +592,8 @@ function persist(part){
       if(part==='events'||!part)   await window.storage.set('ritmo:events', JSON.stringify(state.events));
       if(part==='tags'||!part)     await window.storage.set('ritmo:tags', JSON.stringify(state.tags));
       if(part==='measures'||!part) await window.storage.set('ritmo:measures', JSON.stringify(state.measures));
+      if(part==='expenses'||!part) await window.storage.set('ritmo:expenses', JSON.stringify(state.expenses));
+      if(part==='expenseCats'||!part) await window.storage.set('ritmo:expenseCats', JSON.stringify(state.expenseCats));
     }catch(e){ console.error('Falha ao salvar', e); toast('Não foi possível salvar agora'); }
   }, 300);
 }
@@ -550,6 +610,7 @@ function go(page, btn){
   if(page==='agenda') renderAgenda();
   if(page==='diario') renderDiario();
   if(page==='ciclo') renderCycleCalendar();
+  if(page==='gastos') renderExpenses();
 }
 
 /* ================= Cabeçalho / semana ================= */
@@ -558,7 +619,7 @@ function renderHeader(){
   document.getElementById('todayLabel').textContent = d.toLocaleDateString('pt-BR',{weekday:'long', day:'numeric', month:'long'});
   const strip=document.getElementById('weekstrip'); strip.innerHTML='';
   const names=['dom','seg','ter','qua','qui','sex','sáb'];
-  for(let i=0;i>=-6;i--){
+  for(let i=0;i<=6;i++){
     const iso=isoOffset(i); const dt=new Date(iso+'T12:00:00');
     const dd=state.days[iso];
     const logged = dd && (dd.water>0 || dd.meals.length || dd.activities.length || dd.sleep.hours!=null);
@@ -719,14 +780,14 @@ function renderCycleHistory(){
 
 /* ================= Marcadores ================= */
 function renderColorPicks(){
-  ['agColors','tkColors'].forEach(idc=>{
+  ['agColors','tkColors','expColors'].forEach(idc=>{
     const el=document.getElementById(idc); el.innerHTML='';
     PALETTE.forEach(c=>{
       const b=document.createElement('button'); b.className='swatch'; b.style.background=c;
       b.setAttribute('aria-label','cor');
-      const sel = idc==='agColors'? selColorAg : selColorTk;
+      const sel = idc==='agColors'? selColorAg : idc==='tkColors'? selColorTk : selColorExp;
       if(c===sel) b.classList.add('on');
-      b.onclick=()=>{ if(idc==='agColors') selColorAg=c; else selColorTk=c; renderColorPicks(); };
+      b.onclick=()=>{ if(idc==='agColors') selColorAg=c; else if(idc==='tkColors') selColorTk=c; else selColorExp=c; renderColorPicks(); };
       el.appendChild(b);
     });
   });
@@ -779,6 +840,97 @@ function deleteTag(kind,id){
   toast('Marcador excluído');
 }
 const tagOf=(kind,id)=> state.tags[kind].find(t=>t.id===id);
+
+/* ================= Gastos ================= */
+document.getElementById('expTypeSeg').addEventListener('click', e=>{
+  if(!e.target.dataset.v) return;
+  selExpType = e.target.dataset.v;
+  document.querySelectorAll('#expTypeSeg button').forEach(b=>b.classList.toggle('on', b.dataset.v===selExpType));
+});
+
+function createExpenseCat(){
+  const input=document.getElementById('newExpCat');
+  const name=input.value.trim(); if(!name) return toast('Dê um nome à categoria');
+  state.expenseCats.push({id:uid(), name, color:selColorExp});
+  input.value=''; persist('expenseCats'); renderExpenseCatPickers(); toast('Categoria criada');
+}
+function deleteExpenseCat(id){
+  state.expenseCats = state.expenseCats.filter(c=>c.id!==id);
+  state.expenses.forEach(e=>{ if(e.catId===id) e.catId=null; });
+  if(selExpCat===id) selExpCat=null;
+  persist('expenseCats'); persist('expenses'); renderExpenseCatPickers(); renderExpenses();
+  toast('Categoria excluída');
+}
+function renderExpenseCatPickers(){
+  const el=document.getElementById('expCatPick'); if(!el) return; el.innerHTML='';
+  state.expenseCats.forEach(c=>{
+    const b=document.createElement('button'); b.className='tag-pill'+(selExpCat===c.id?' on':''); b.textContent=c.name;
+    if(selExpCat===c.id){ b.style.background=c.color; b.style.borderColor=c.color; }
+    b.onclick=()=>{ selExpCat = selExpCat===c.id? null : c.id; renderExpenseCatPickers(); };
+    el.appendChild(b);
+  });
+  const mg=document.getElementById('expCatManage');
+  if(mg) mg.innerHTML = state.expenseCats.length ? state.expenseCats.map(c=>`
+    <div class="list-item"><div class="grow"><span class="badge" style="background:${c.color}20;color:${c.color}">${c.name}</span></div>
+    <button class="del" onclick="deleteExpenseCat('${c.id}')" aria-label="Excluir categoria">✕</button></div>`).join('') : '<div class="empty">Nenhuma categoria criada ainda.</div>';
+}
+const expCatOf = id => state.expenseCats.find(c=>c.id===id);
+const fmtBRL = v => v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+
+function addExpense(){
+  const amount=parseFloat(document.getElementById('expAmount').value);
+  const date=document.getElementById('expDate').value || todayISO();
+  const desc=document.getElementById('expDesc').value.trim();
+  if(isNaN(amount) || amount<=0) return toast('Informe um valor válido');
+  if(!selExpCat) return toast('Escolha uma categoria');
+  state.expenses.push({id:uid(), date, amount, catId:selExpCat, type:selExpType, desc});
+  document.getElementById('expAmount').value=''; document.getElementById('expDesc').value='';
+  persist('expenses'); renderExpenses(); toast('Gasto adicionado');
+}
+function delExpense(id){ state.expenses=state.expenses.filter(e=>e.id!==id); persist('expenses'); renderExpenses(); }
+
+let expView=(()=>{ const t=todayISO().split('-'); return {y:+t[0], m:+t[1]}; })();
+function prevExpMonth(){ expView.m--; if(expView.m<1){expView.m=12; expView.y--;} renderExpenses(); }
+function nextExpMonth(){ expView.m++; if(expView.m>12){expView.m=1; expView.y++;} renderExpenses(); }
+
+function renderExpenses(){
+  renderExpenseCatPickers();
+  document.getElementById('expDate').value = document.getElementById('expDate').value || todayISO();
+
+  document.getElementById('expMonthLabel').textContent = MESES_PT[expView.m-1]+' de '+expView.y;
+  const prefix = expView.y+'-'+String(expView.m).padStart(2,'0');
+  const monthExpenses = state.expenses.filter(e=>e.date.startsWith(prefix));
+  const total = monthExpenses.reduce((s,e)=>s+e.amount,0);
+  const fixo = monthExpenses.filter(e=>e.type==='Fixo').reduce((s,e)=>s+e.amount,0);
+  const variavel = monthExpenses.filter(e=>e.type==='Variável').reduce((s,e)=>s+e.amount,0);
+  document.getElementById('expSummary').innerHTML = `
+    <div class="stat s-amber" style="grid-column:1/-1"><b>${fmtBRL(total)}</b><span>total gasto no mês</span></div>
+    <div class="stat s-berry"><b>${fmtBRL(fixo)}</b><span>gastos fixos</span></div>
+    <div class="stat s-sky"><b>${fmtBRL(variavel)}</b><span>gastos variáveis</span></div>`;
+
+  const byCat={};
+  monthExpenses.forEach(e=>{ byCat[e.catId||'—']=(byCat[e.catId||'—']||0)+e.amount; });
+  const catEl=document.getElementById('expByCategory');
+  const rows=Object.entries(byCat).sort((a,b)=>b[1]-a[1]);
+  catEl.innerHTML = rows.length ? '<div class="muted" style="font-weight:700; margin-bottom:6px">Por categoria</div>' + rows.map(([catId,v])=>{
+    const c=expCatOf(catId);
+    const pct = total>0 ? Math.round(v/total*100) : 0;
+    return `<div class="list-item"><div class="grow">
+      <span class="badge" style="background:${c?c.color+'20':'#eee'};color:${c?c.color:'#888'}">${c?c.name:'Sem categoria'}</span>
+      <span class="muted"> · ${pct}%</span></div><b>${fmtBRL(v)}</b></div>`;
+  }).join('') : '<div class="empty">Nenhum gasto registrado neste mês.</div>';
+
+  const hist=document.getElementById('expenseHistory');
+  const all = state.expenses.slice().sort((a,b)=> b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
+  hist.innerHTML = all.length ? all.map(e=>{
+    const c=expCatOf(e.catId);
+    return `<div class="list-item"><div class="grow">
+      <b>${fmtBRL(e.amount)}</b> <span class="badge" style="background:${c?c.color+'20':'#eee'};color:${c?c.color:'#888'}">${c?c.name:'Sem categoria'}</span>
+      <span class="badge" style="background:#eee;color:#666">${e.type}</span><br>
+      <span class="muted">${fmtBR(e.date)}${e.desc?' · '+e.desc:''}</span>
+    </div><button class="del" onclick="delExpense('${e.id}')" aria-label="Excluir">✕</button></div>`;
+  }).join('') : '<div class="empty">Nenhum gasto registrado ainda.</div>';
+}
 
 /* ================= Tarefas ================= */
 function addTask(){
@@ -961,7 +1113,13 @@ function weekData(){
   const flowDays = days.filter(x=>x.d.cycle.flow && x.d.cycle.flow!=='Nenhum').length;
   const tasksDone = state.tasks.filter(t=>t.done && t.doneAt>=isoOffset(-6)).length;
   const eventsWeek = state.events.filter(e=> e.date>=isoOffset(-6) && e.date<=todayISO()).length;
-  return {days, logged:logged.length, waterAvg, sleepAvg, actMin, actDays, meals, flowDays, tasksDone, eventsWeek};
+  const weekExpenses = state.expenses.filter(e=> e.date>=isoOffset(-6) && e.date<=todayISO());
+  const spendTotal = weekExpenses.reduce((s,e)=>s+e.amount,0);
+  const spendFixo = weekExpenses.filter(e=>e.type==='Fixo').reduce((s,e)=>s+e.amount,0);
+  const spendVariavel = weekExpenses.filter(e=>e.type==='Variável').reduce((s,e)=>s+e.amount,0);
+  const spendByCat={};
+  weekExpenses.forEach(e=>{ spendByCat[e.catId||'—']=(spendByCat[e.catId||'—']||0)+e.amount; });
+  return {days, logged:logged.length, waterAvg, sleepAvg, actMin, actDays, meals, flowDays, tasksDone, eventsWeek, spendTotal, spendFixo, spendVariavel, spendByCat};
 }
 function renderReport(){
   const w=weekData();
@@ -974,8 +1132,15 @@ function renderReport(){
     <div class="stat s-amber"><b>${w.meals}</b><span>refeições registradas</span></div>
     <div class="stat s-berry"><b>${w.flowDays}</b><span>dia(s) de fluxo menstrual</span></div>
     <div class="stat s-moss"><b>${w.tasksDone}</b><span>tarefas concluídas na semana</span></div>
+    <div class="stat s-amber" style="grid-column:1/-1"><b>${fmtBRL(w.spendTotal)}</b><span>total gasto na semana · ${fmtBRL(w.spendFixo)} fixo · ${fmtBRL(w.spendVariavel)} variável</span></div>
     ${latest? `<div class="stat s-moss" style="grid-column:1/-1"><b>${latest.weight.toFixed(1)} kg</b>
       <span>última medição (${fmtBR(latest.date)}) · m. magra ${latest.lean!=null?latest.lean.toFixed(1)+' kg':'—'} · gordura ${latest.fat!=null?latest.fat.toFixed(1)+'%':'—'}</span></div>`:''}`;
+  const catRows=Object.entries(w.spendByCat).sort((a,b)=>b[1]-a[1]);
+  document.getElementById('reportSpendByCat').innerHTML = catRows.length ? catRows.map(([catId,v])=>{
+    const c=expCatOf(catId);
+    return `<div class="list-item"><div class="grow">
+      <span class="badge" style="background:${c?c.color+'20':'#eee'};color:${c?c.color:'#888'}">${c?c.name:'Sem categoria'}</span></div><b>${fmtBRL(v)}</b></div>`;
+  }).join('') : '<div class="empty">Nenhum gasto registrado nos últimos 7 dias.</div>';
   document.getElementById('reportDays').innerHTML = w.days.map(({iso,d})=>`
     <div class="list-item"><div class="grow">
       <b style="text-transform:capitalize">${weekdayName(iso)} · ${fmtBR(iso)}</b><br>
@@ -1054,7 +1219,8 @@ function downloadPDF(){
   setCloudStatus('connecting');
   await loadAll();
   document.getElementById('evDate').value=todayISO();
-  renderHeader(); renderToday(); renderTagPickers(); renderColorPicks();
+  document.getElementById('expDate').value=todayISO();
+  renderHeader(); renderToday(); renderTagPickers(); renderColorPicks(); renderExpenseCatPickers();
   renderTasks(); renderAgenda(); renderMeasures();
   subscribeRealtime();
   pingCloud();
