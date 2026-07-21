@@ -152,7 +152,7 @@
   .cloud-status.offline .dot{background:var(--berry);}
   .cloud-status.connecting .dot{background:var(--amber); animation:pulse 1.2s infinite;}
   @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
-  .cloud-status-detail{font-size:11px; color:var(--berry); margin-top:5px; max-width:400px;}
+  .cloud-status-detail{font-size:11px; color:var(--berry); margin-top:5px; max-width:400px; word-break:break-word;}
 </style>
 </head>
 <body>
@@ -417,9 +417,13 @@ function subscribeRealtime(){
       const row = payload.new && payload.new.key ? payload.new : payload.old;
       if(row && row.key && payload.new && payload.new.value) applyRemoteChange(row.key, payload.new.value);
     })
-    .subscribe(status => {
+    .subscribe((status, err) => {
       if(status==='SUBSCRIBED') setCloudStatus('online');
-      else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT' || status==='CLOSED') setCloudStatus('offline', 'canal em tempo real: '+status);
+      else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT' || status==='CLOSED'){
+        const reason = err && (err.message || err.toString ? err.toString() : JSON.stringify(err));
+        console.error('Realtime', status, err);
+        setCloudStatus('offline', 'canal em tempo real ('+status+')'+(reason?': '+reason:''));
+      }
     });
 }
 
