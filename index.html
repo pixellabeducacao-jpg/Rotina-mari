@@ -123,6 +123,24 @@
   table.hist th{text-align:left; color:var(--sub); font-weight:600; padding:6px 4px; border-bottom:1px solid var(--line);}
   table.hist td{padding:7px 4px; border-bottom:1px solid var(--line);}
 
+  /* Ciclo menstrual - calendário */
+  .cyc-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;}
+  .cyc-nav .lbl{font-family:'Fraunces',serif; font-size:16px; font-weight:600; text-transform:capitalize;}
+  .cyc-nav button{font-size:20px; padding:4px 12px; color:var(--berry); font-weight:700;}
+  .cyc-nav button:active{transform:scale(.9);}
+  .cyc-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+  .cyc-grid .wd{text-align:center; font-size:11px; color:var(--sub); font-weight:700; text-transform:uppercase; padding-bottom:2px;}
+  .cday{aspect-ratio:1; border-radius:10px; border:1px solid var(--line); background:#fff; font-size:13px; font-weight:600; color:var(--ink); display:flex; align-items:center; justify-content:center; width:100%;}
+  .cday:active{transform:scale(.92);}
+  .cday.empty{border:none; background:none; pointer-events:none;}
+  .cday.today{box-shadow:0 0 0 2px var(--moss) inset;}
+  .cday.flow-leve{background:var(--berry-soft); color:var(--berry); border-color:var(--berry-soft);}
+  .cday.flow-moderado{background:#E29BB8; color:#54172F; border-color:#E29BB8;}
+  .cday.flow-intenso{background:var(--berry); color:#fff; border-color:var(--berry);}
+  .cyc-legend{display:flex; gap:14px; margin-top:12px; flex-wrap:wrap;}
+  .cyc-legend span{display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--sub);}
+  .cyc-legend i{width:13px;height:13px;border-radius:4px; display:inline-block; font-style:normal;}
+
   /* Relatório */
   .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .stat{border-radius:14px; padding:14px;}
@@ -306,6 +324,33 @@
     </div>
   </section>
 
+  <!-- ===== CICLO ===== -->
+  <section class="tabpage" id="page-ciclo">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--berry-soft)">🌸</span> Calendário do ciclo</h2>
+      <div class="muted" style="margin-bottom:8px">Toque num dia para marcar o fluxo. Toque de novo para mudar a intensidade — funciona em qualquer mês, inclusive passados.</div>
+      <div class="cyc-nav">
+        <button onclick="prevCycleMonth()">‹</button>
+        <div class="lbl" id="cycleMonthLabel"></div>
+        <button onclick="nextCycleMonth()">›</button>
+      </div>
+      <div class="cyc-grid">
+        <div class="wd">D</div><div class="wd">S</div><div class="wd">T</div><div class="wd">Q</div><div class="wd">Q</div><div class="wd">S</div><div class="wd">S</div>
+      </div>
+      <div class="cyc-grid" id="cycleGrid" style="margin-top:6px"></div>
+      <div class="cyc-legend">
+        <span><i style="background:var(--berry-soft)"></i>Leve</span>
+        <span><i style="background:#E29BB8"></i>Moderado</span>
+        <span><i style="background:var(--berry)"></i>Intenso</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Histórico de ciclos</h2>
+      <div class="muted" style="margin-bottom:6px">Calculado automaticamente a partir dos dias marcados.</div>
+      <div id="cycleHistory"></div>
+    </div>
+  </section>
+
   <!-- ===== MEDIDAS ===== -->
   <section class="tabpage" id="page-medidas">
     <div class="card">
@@ -346,6 +391,7 @@
   <button data-page="agenda" onclick="go('agenda',this)"><span class="ic">📅</span>Agenda</button>
   <button data-page="tarefas" onclick="go('tarefas',this)"><span class="ic">✅</span>Tarefas</button>
   <button data-page="diario" onclick="go('diario',this)"><span class="ic">📖</span>Diário</button>
+  <button data-page="ciclo" onclick="go('ciclo',this)"><span class="ic">🌸</span>Ciclo</button>
   <button data-page="medidas" onclick="go('medidas',this)"><span class="ic">⚖️</span>Medidas</button>
   <button data-page="relatorio" onclick="go('relatorio',this)"><span class="ic">📊</span>Relatório</button>
 </nav>
@@ -404,7 +450,7 @@ window.storage = {
 function applyRemoteChange(key, value){
   try{
     const parsed = JSON.parse(value);
-    if(key==='ritmo:days'){ state.days=parsed; renderToday(); renderHeader(); if(document.getElementById('page-relatorio').classList.contains('active')) renderReport(); if(document.getElementById('page-diario').classList.contains('active')) renderDiario(); }
+    if(key==='ritmo:days'){ state.days=parsed; renderToday(); renderHeader(); if(document.getElementById('page-relatorio').classList.contains('active')) renderReport(); if(document.getElementById('page-diario').classList.contains('active')) renderDiario(); if(document.getElementById('page-ciclo').classList.contains('active')) renderCycleCalendar(); }
     else if(key==='ritmo:tasks'){ state.tasks=parsed; renderTasks(); }
     else if(key==='ritmo:events'){ state.events=parsed; renderAgenda(); }
     else if(key==='ritmo:tags'){ state.tags=parsed; renderTagPickers(); }
@@ -486,6 +532,7 @@ function go(page, btn){
   if(page==='relatorio') renderReport();
   if(page==='agenda') renderAgenda();
   if(page==='diario') renderDiario();
+  if(page==='ciclo') renderCycleCalendar();
 }
 
 /* ================= Cabeçalho / semana ================= */
@@ -581,7 +628,7 @@ document.getElementById('sleepQ').addEventListener('click',e=>{
   if(e.target.dataset.v){ day(todayISO()).sleep.quality=e.target.dataset.v; persist('days'); renderToday(); }
 });
 document.getElementById('flowSeg').addEventListener('click',e=>{
-  if(e.target.dataset.v){ day(todayISO()).cycle.flow=e.target.dataset.v; persist('days'); renderToday(); }
+  if(e.target.dataset.v){ day(todayISO()).cycle.flow=e.target.dataset.v; persist('days'); renderToday(); if(document.getElementById('page-ciclo').classList.contains('active')) renderCycleCalendar(); }
 });
 document.getElementById('sympSeg').addEventListener('click',e=>{
   const v=e.target.dataset.v; if(!v) return;
@@ -589,6 +636,69 @@ document.getElementById('sympSeg').addEventListener('click',e=>{
   s.includes(v)? s.splice(s.indexOf(v),1) : s.push(v);
   persist('days'); renderToday();
 });
+
+/* ================= Ciclo menstrual: calendário mensal ================= */
+const MESES_PT=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const FLOW_LEVELS=['Nenhum','Leve','Moderado','Intenso'];
+let cycleView=(()=>{ const t=todayISO().split('-'); return {y:+t[0], m:+t[1]}; })();
+
+function prevCycleMonth(){ cycleView.m--; if(cycleView.m<1){cycleView.m=12; cycleView.y--;} renderCycleCalendar(); }
+function nextCycleMonth(){ cycleView.m++; if(cycleView.m>12){cycleView.m=1; cycleView.y++;} renderCycleCalendar(); }
+
+function toggleCycleDay(iso){
+  const d=day(iso);
+  const idx=FLOW_LEVELS.indexOf(d.cycle.flow||'Nenhum');
+  d.cycle.flow=FLOW_LEVELS[(idx+1)%FLOW_LEVELS.length];
+  persist('days');
+  renderCycleCalendar();
+  if(iso===todayISO()) renderToday();
+}
+
+function renderCycleCalendar(){
+  document.getElementById('cycleMonthLabel').textContent = MESES_PT[cycleView.m-1]+' de '+cycleView.y;
+  const first=new Date(cycleView.y, cycleView.m-1, 1);
+  const startWeekday=first.getDay();
+  const daysInMonth=new Date(cycleView.y, cycleView.m, 0).getDate();
+  let html='';
+  for(let i=0;i<startWeekday;i++) html+='<div class="cday empty"></div>';
+  for(let d=1; d<=daysInMonth; d++){
+    const iso=cycleView.y+'-'+String(cycleView.m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    const flow=(state.days[iso] && state.days[iso].cycle && state.days[iso].cycle.flow) || 'Nenhum';
+    const flowCls = flow==='Nenhum' ? '' : 'flow-'+flow.toLowerCase();
+    html+=`<button class="cday ${flowCls}${iso===todayISO()?' today':''}" onclick="toggleCycleDay('${iso}')">${d}</button>`;
+  }
+  document.getElementById('cycleGrid').innerHTML=html;
+  renderCycleHistory();
+}
+
+function deriveCycles(){
+  const flowDates=Object.keys(state.days)
+    .filter(iso=> state.days[iso].cycle && state.days[iso].cycle.flow && state.days[iso].cycle.flow!=='Nenhum')
+    .sort();
+  const cycles=[]; let cur=null;
+  flowDates.forEach(iso=>{
+    if(cur && addDaysIso(cur.end,1)===iso){ cur.end=iso; }
+    else { if(cur) cycles.push(cur); cur={start:iso,end:iso}; }
+  });
+  if(cur) cycles.push(cur);
+  return cycles.map((c,i)=>{
+    const duration = Math.round((new Date(c.end+'T12:00:00')-new Date(c.start+'T12:00:00'))/86400000)+1;
+    const cycleLen = i>0 ? Math.round((new Date(c.start+'T12:00:00')-new Date(cycles[i-1].start+'T12:00:00'))/86400000) : null;
+    return {...c, duration, cycleLen};
+  });
+}
+function addDaysIso(iso,n){ const d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+function renderCycleHistory(){
+  const cycles=deriveCycles().reverse();
+  const el=document.getElementById('cycleHistory');
+  el.innerHTML = cycles.length ? cycles.map(c=>`
+    <div class="list-item"><div class="grow">
+      <b>${fmtBR(c.start)} — ${fmtBR(c.end)}</b> <span class="muted">· ${c.duration} dia(s) de fluxo</span>
+      ${c.cycleLen!=null ? `<br><span class="muted">Ciclo de ${c.cycleLen} dias desde o início anterior</span>` : ''}
+    </div></div>`).join('')
+    : '<div class="empty">Nenhum ciclo registrado ainda. Marque os dias no calendário acima.</div>';
+}
 
 /* ================= Marcadores ================= */
 function renderColorPicks(){
