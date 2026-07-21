@@ -153,43 +153,9 @@
   .cloud-status.connecting .dot{background:var(--amber); animation:pulse 1.2s infinite;}
   @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
   .cloud-status-detail{font-size:11px; color:var(--berry); margin-top:5px; max-width:400px;}
-
-  /* Autenticação */
-  #authScreen{position:fixed; inset:0; background:var(--bg); z-index:200; display:flex; align-items:center; justify-content:center; padding:24px;}
-  #authScreen.hidden{display:none;}
-  .auth-box{width:100%; max-width:380px; background:var(--card); border:1px solid var(--line); border-radius:22px; padding:32px 26px; text-align:center;}
-  .auth-logo{width:52px; height:52px; border-radius:16px; background:linear-gradient(160deg,#567B62,#3E5D49); margin:0 auto 16px; display:flex; align-items:center; justify-content:center; font-size:24px;}
-  .auth-box h1{font-size:24px; margin-bottom:6px;}
-  .auth-box p.sub{color:var(--sub); font-size:14px; margin-bottom:24px; line-height:1.5;}
-  .google-btn{width:100%; padding:13px; border-radius:12px; border:1.5px solid var(--line); background:#fff; font-weight:700; font-size:14px; color:var(--ink); display:flex; align-items:center; justify-content:center; gap:10px;}
-  .google-btn:active{transform:scale(.98);}
-  .auth-msg{font-size:13px; text-align:center; margin-top:14px; min-height:16px; color:var(--berry);}
-
-  .account-bar{position:fixed; top:16px; right:16px; z-index:40; background:#fff; border:1px solid var(--line); border-radius:99px; padding:6px 6px 6px 14px; display:flex; align-items:center; gap:10px; font-size:12px; color:var(--sub); font-weight:600; max-width:70vw;}
-  .account-bar.hidden{display:none;}
-  .account-bar span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:36vw;}
-  .account-bar button{background:var(--moss-soft); color:var(--moss); font-weight:700; padding:6px 12px; border-radius:99px; font-size:12px; flex:none;}
 </style>
 </head>
 <body>
-
-<div id="authScreen">
-  <div class="auth-box">
-    <div class="auth-logo">🌿</div>
-    <h1>Ritmo</h1>
-    <p class="sub">Entre com sua conta Google para acessar sua rotina, sincronizada em todos os dispositivos.</p>
-    <button class="google-btn" onclick="loginWithGoogle()">
-      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84c-.21 1.13-.84 2.09-1.8 2.73v2.27h2.9c1.7-1.57 2.7-3.88 2.7-6.64z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.17l-2.9-2.27c-.8.54-1.83.86-3.06.86-2.35 0-4.34-1.59-5.05-3.72H.96v2.34C2.44 15.98 5.48 18 9 18z"/><path fill="#FBBC05" d="M3.95 10.7A5.4 5.4 0 0 1 3.68 9c0-.59.1-1.17.27-1.7V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l2.99-2.34z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0 5.48 0 2.44 2.02.96 4.96l2.99 2.34C4.66 5.17 6.65 3.58 9 3.58z"/></svg>
-      Continuar com Google
-    </button>
-    <div class="auth-msg" id="authMsg"></div>
-  </div>
-</div>
-
-<div class="account-bar hidden" id="accountBar">
-  <span id="userEmailLabel"></span>
-  <button onclick="signOut()">Sair</button>
-</div>
 
 <header>
   <div class="eyebrow">Seu ritmo semanal</div>
@@ -414,23 +380,20 @@ setInterval(pingCloud, 45000);
 
 window.storage = {
   async get(k){
-    if(!currentUser) throw new Error('not authenticated');
-    const { data, error } = await sb.from('ritmo_kv').select('value').eq('user_id', currentUser.id).eq('key', k).maybeSingle();
+    const { data, error } = await sb.from('ritmo_kv').select('value').eq('key', k).maybeSingle();
     if(error){ setCloudStatus('offline', error.message); throw error; }
     setCloudStatus('online');
     if(!data) throw new Error('not found');
     return {key:k, value:data.value};
   },
   async set(k,v){
-    if(!currentUser) throw new Error('not authenticated');
-    const { error } = await sb.from('ritmo_kv').upsert({ user_id:currentUser.id, key:k, value:v, updated_at:new Date().toISOString() });
+    const { error } = await sb.from('ritmo_kv').upsert({ key:k, value:v, updated_at:new Date().toISOString() });
     if(error){ setCloudStatus('offline', error.message); throw error; }
     setCloudStatus('online');
     return {key:k, value:v};
   },
   async delete(k){
-    if(!currentUser) throw new Error('not authenticated');
-    const { error } = await sb.from('ritmo_kv').delete().eq('user_id', currentUser.id).eq('key', k);
+    const { error } = await sb.from('ritmo_kv').delete().eq('key', k);
     if(error){ setCloudStatus('offline', error.message); throw error; }
     setCloudStatus('online');
     return {key:k, deleted:true};
@@ -449,9 +412,8 @@ function applyRemoteChange(key, value){
   }catch(e){ console.error('Falha ao aplicar atualização remota', e); }
 }
 function subscribeRealtime(){
-  if(!currentUser) return;
-  sb.channel('ritmo_kv_sync_'+currentUser.id)
-    .on('postgres_changes', { event:'*', schema:'public', table:'ritmo_kv', filter:`user_id=eq.${currentUser.id}` }, payload => {
+  sb.channel('ritmo_kv_sync')
+    .on('postgres_changes', { event:'*', schema:'public', table:'ritmo_kv' }, payload => {
       const row = payload.new && payload.new.key ? payload.new : payload.old;
       if(row && row.key && payload.new && payload.new.value) applyRemoteChange(row.key, payload.new.value);
     })
@@ -459,40 +421,6 @@ function subscribeRealtime(){
       if(status==='SUBSCRIBED') setCloudStatus('online');
       else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT' || status==='CLOSED') setCloudStatus('offline', 'canal em tempo real: '+status);
     });
-}
-
-/* ===== Login com Google ===== */
-let currentUser = null;
-let appStarted = false;
-
-function showAuthScreen(){
-  document.getElementById('authScreen').classList.remove('hidden');
-  document.getElementById('accountBar').classList.add('hidden');
-}
-function revealApp(){
-  document.getElementById('authScreen').classList.add('hidden');
-  document.getElementById('accountBar').classList.remove('hidden');
-  document.getElementById('userEmailLabel').textContent = currentUser?.email || '';
-}
-function loginWithGoogle(){
-  document.getElementById('authMsg').textContent='';
-  sb.auth.signInWithOAuth({ provider:'google', options:{ redirectTo: window.location.origin } });
-}
-function signOut(){
-  appStarted=false;
-  sb.auth.signOut();
-}
-sb.auth.onAuthStateChange((event, session)=>{
-  if(event==='SIGNED_IN' && session && session.user){
-    currentUser=session.user; revealApp(); startApp();
-  } else if(event==='SIGNED_OUT'){
-    currentUser=null; showAuthScreen();
-  }
-});
-async function checkAuth(){
-  const { data:{ session } } = await sb.auth.getSession();
-  if(session && session.user){ currentUser=session.user; revealApp(); startApp(); }
-  else { showAuthScreen(); }
 }
 
 /* ===== PWA: funciona offline e instala na tela inicial ===== */
@@ -944,9 +872,7 @@ function downloadPDF(){
 }
 
 /* ================= Inicialização ================= */
-async function startApp(){
-  if(appStarted) return;
-  appStarted=true;
+(async function init(){
   setCloudStatus('connecting');
   await loadAll();
   document.getElementById('evDate').value=todayISO();
@@ -954,8 +880,7 @@ async function startApp(){
   renderTasks(); renderAgenda(); renderMeasures();
   subscribeRealtime();
   pingCloud();
-}
-checkAuth();
+})();
 </script>
 </body>
 </html>
