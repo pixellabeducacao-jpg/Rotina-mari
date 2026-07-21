@@ -140,6 +140,15 @@
   .toast.show{opacity:1;}
   .empty{color:var(--sub); font-size:14px; padding:8px 0;}
   @media (prefers-reduced-motion:reduce){ *{animation:none!important; transition:none!important;} }
+
+  .cloud-status{display:inline-flex; align-items:center; gap:6px; margin-top:8px; padding:5px 12px 5px 9px; border-radius:99px; background:#fff; border:1px solid var(--line); font-size:12px; font-weight:700; color:var(--sub);}
+  .cloud-status .dot{width:8px; height:8px; border-radius:50%; background:var(--amber); flex:none; transition:background .3s;}
+  .cloud-status.online{color:var(--moss); border-color:var(--moss-soft); background:var(--moss-soft);}
+  .cloud-status.online .dot{background:var(--moss); box-shadow:0 0 0 3px rgba(76,107,87,.18);}
+  .cloud-status.offline{color:var(--berry); border-color:var(--berry-soft); background:var(--berry-soft);}
+  .cloud-status.offline .dot{background:var(--berry);}
+  .cloud-status.connecting .dot{background:var(--amber); animation:pulse 1.2s infinite;}
+  @keyframes pulse{0%,100%{opacity:1;} 50%{opacity:.35;}}
 </style>
 </head>
 <body>
@@ -148,6 +157,7 @@
   <div class="eyebrow">Seu ritmo semanal</div>
   <h1>Ritmo</h1>
   <div class="date" id="todayLabel"></div>
+  <div class="cloud-status" id="cloudStatus"><span class="dot"></span><span id="cloudStatusText">Conectando…</span></div>
 </header>
 <div class="weekstrip" id="weekstrip"></div>
 
@@ -323,21 +333,42 @@ const SUPABASE_URL = 'https://mcxjgrllcqavwupsvmof.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jeGpncmxsY3Fhdnd1cHN2bW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2MTA4MzgsImV4cCI6MjEwMDE4NjgzOH0.3ADWIrJr1smfIxFOhOS9DV9bYqLv4D0rd2RU9vG4CK4';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+/* ===== Indicador de conexão com a nuvem ===== */
+function setCloudStatus(s){
+  const el=document.getElementById('cloudStatus'); const t=document.getElementById('cloudStatusText');
+  if(!el) return;
+  el.className='cloud-status '+s;
+  t.textContent = s==='online' ? 'Conectado à nuvem' : s==='offline' ? 'Sem conexão' : 'Conectando…';
+}
+async function pingCloud(){
+  try{
+    const { error } = await sb.from('ritmo_kv').select('key', { head:true, count:'exact' });
+    if(error) throw error;
+    setCloudStatus('online');
+  }catch(e){ setCloudStatus('offline'); }
+}
+window.addEventListener('online', pingCloud);
+window.addEventListener('offline', ()=> setCloudStatus('offline'));
+setInterval(pingCloud, 45000);
+
 window.storage = {
   async get(k){
     const { data, error } = await sb.from('ritmo_kv').select('value').eq('key', k).maybeSingle();
-    if(error) throw error;
+    if(error){ setCloudStatus('offline'); throw error; }
+    setCloudStatus('online');
     if(!data) throw new Error('not found');
     return {key:k, value:data.value};
   },
   async set(k,v){
     const { error } = await sb.from('ritmo_kv').upsert({ key:k, value:v, updated_at:new Date().toISOString() });
-    if(error) throw error;
+    if(error){ setCloudStatus('offline'); throw error; }
+    setCloudStatus('online');
     return {key:k, value:v};
   },
   async delete(k){
     const { error } = await sb.from('ritmo_kv').delete().eq('key', k);
-    if(error) throw error;
+    if(error){ setCloudStatus('offline'); throw error; }
+    setCloudStatus('online');
     return {key:k, deleted:true};
   }
 };
@@ -359,7 +390,10 @@ function subscribeRealtime(){
       const row = payload.new && payload.new.key ? payload.new : payload.old;
       if(row && row.key && payload.new && payload.new.value) applyRemoteChange(row.key, payload.new.value);
     })
-    .subscribe();
+    .subscribe(status => {
+      if(status==='SUBSCRIBED') setCloudStatus('online');
+      else if(status==='CHANNEL_ERROR' || status==='TIMED_OUT' || status==='CLOSED') setCloudStatus('offline');
+    });
 }
 
 /* ===== PWA: funciona offline e instala na tela inicial ===== */
@@ -737,11 +771,13 @@ function downloadPDF(){
 
 /* ================= Inicialização ================= */
 (async function init(){
+  setCloudStatus('connecting');
   await loadAll();
   document.getElementById('evDate').value=todayISO();
   renderHeader(); renderToday(); renderTagPickers(); renderColorPicks();
   renderTasks(); renderAgenda(); renderMeasures();
   subscribeRealtime();
+  pingCloud();
 })();
 </script>
 </body>
