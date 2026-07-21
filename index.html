@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
     --bg:#F1F4EE; --card:#FFFFFF; --ink:#26332C; --sub:#6C7A70; --line:#E1E7DD;
@@ -317,12 +318,50 @@
 <div class="toast" id="toast"></div>
 
 <script>
-/* ===== Armazenamento local (dados ficam no seu aparelho) ===== */
+/* ===== Supabase: dados sincronizados entre todos os seus dispositivos ===== */
+const SUPABASE_URL = 'https://mcxjgrllcqavwupsvmof.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1jeGpncmxsY3Fhdnd1cHN2bW9mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2MTA4MzgsImV4cCI6MjEwMDE4NjgzOH0.3ADWIrJr1smfIxFOhOS9DV9bYqLv4D0rd2RU9vG4CK4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
 window.storage = {
-  async get(k){ const v=localStorage.getItem(k); if(v===null) throw new Error('not found'); return {key:k, value:v}; },
-  async set(k,v){ localStorage.setItem(k,v); return {key:k, value:v}; },
-  async delete(k){ localStorage.removeItem(k); return {key:k, deleted:true}; }
+  async get(k){
+    const { data, error } = await sb.from('ritmo_kv').select('value').eq('key', k).maybeSingle();
+    if(error) throw error;
+    if(!data) throw new Error('not found');
+    return {key:k, value:data.value};
+  },
+  async set(k,v){
+    const { error } = await sb.from('ritmo_kv').upsert({ key:k, value:v, updated_at:new Date().toISOString() });
+    if(error) throw error;
+    return {key:k, value:v};
+  },
+  async delete(k){
+    const { error } = await sb.from('ritmo_kv').delete().eq('key', k);
+    if(error) throw error;
+    return {key:k, deleted:true};
+  }
 };
+
+/* Sincronização em tempo real: quando outro dispositivo salva algo, este app se atualiza sozinho */
+function applyRemoteChange(key, value){
+  try{
+    const parsed = JSON.parse(value);
+    if(key==='ritmo:days'){ state.days=parsed; renderToday(); renderHeader(); if(document.getElementById('page-relatorio').classList.contains('active')) renderReport(); }
+    else if(key==='ritmo:tasks'){ state.tasks=parsed; renderTasks(); }
+    else if(key==='ritmo:events'){ state.events=parsed; renderAgenda(); }
+    else if(key==='ritmo:tags'){ state.tags=parsed; renderTagPickers(); }
+    else if(key==='ritmo:measures'){ state.measures=parsed; renderMeasures(); }
+  }catch(e){ console.error('Falha ao aplicar atualização remota', e); }
+}
+function subscribeRealtime(){
+  sb.channel('ritmo_kv_sync')
+    .on('postgres_changes', { event:'*', schema:'public', table:'ritmo_kv' }, payload => {
+      const row = payload.new && payload.new.key ? payload.new : payload.old;
+      if(row && row.key && payload.new && payload.new.value) applyRemoteChange(row.key, payload.new.value);
+    })
+    .subscribe();
+}
+
 /* ===== PWA: funciona offline e instala na tela inicial ===== */
 if('serviceWorker' in navigator){
   window.addEventListener('load', ()=> navigator.serviceWorker.register('sw.js').catch(()=>{}));
@@ -702,6 +741,7 @@ function downloadPDF(){
   document.getElementById('evDate').value=todayISO();
   renderHeader(); renderToday(); renderTagPickers(); renderColorPicks();
   renderTasks(); renderAgenda(); renderMeasures();
+  subscribeRealtime();
 })();
 </script>
 </body>
