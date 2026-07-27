@@ -239,6 +239,15 @@
     </div>
 
     <div class="card">
+      <h2><span class="chip-ic" style="background:var(--sky-soft)">💊</span> Sintomas</h2>
+      <div id="sympList"></div>
+      <div class="inline-form">
+        <input id="sympDesc" placeholder="O que você sentiu?" style="flex-basis:100%">
+        <button class="btn" onclick="addSymptom()">Registrar</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2><span class="chip-ic" style="background:var(--lav-soft)">🌙</span> Sono</h2>
       <div class="inline-form" style="margin-top:0">
         <input id="sleepH" type="number" step="0.5" min="0" max="24" placeholder="horas dormidas" style="max-width:160px">
@@ -327,7 +336,18 @@
   <!-- ===== DIÁRIO ===== -->
   <section class="tabpage" id="page-diario">
     <div class="card">
-      <h2><span class="chip-ic" style="background:var(--amber-soft)">📖</span> Refeições & atividade física</h2>
+      <h2><span class="chip-ic" style="background:var(--amber-soft)">🍽️</span> Registrar refeição</h2>
+      <div class="inline-form" style="margin-top:0">
+        <select id="mealTypeDiario">
+          <option>Café da manhã</option><option>Lanche da manhã</option><option>Almoço</option>
+          <option>Lanche da tarde</option><option>Jantar</option><option>Ceia</option>
+        </select>
+        <input id="mealDescDiario" placeholder="O que você comeu?">
+        <button class="btn" onclick="addMealDiario()">Registrar</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--amber-soft)">📖</span> Refeições, atividade física & sintomas</h2>
       <div class="muted" style="margin-bottom:6px">Histórico completo, do mais recente ao mais antigo.</div>
       <div id="diarioList"></div>
     </div>
@@ -565,8 +585,13 @@ const fmtBR = iso => { const [y,m,d]=iso.split('-'); return `${d}/${m}/${y}`; };
 const weekdayName = iso => new Date(iso+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long'});
 const uid = () => Math.random().toString(36).slice(2,9);
 
-function emptyDay(){ return { water:0, meals:[], activities:[], sleep:{hours:null,quality:null}, cycle:{flow:'Nenhum',symptoms:[]} }; }
-function day(iso){ if(!state.days[iso]) state.days[iso]=emptyDay(); return state.days[iso]; }
+function emptyDay(){ return { water:0, meals:[], activities:[], symptoms:[], sleep:{hours:null,quality:null}, cycle:{flow:'Nenhum',symptoms:[]} }; }
+function day(iso){
+  if(!state.days[iso]) state.days[iso]=emptyDay();
+  const d=state.days[iso];
+  if(!d.symptoms) d.symptoms=[];
+  return d;
+}
 
 async function loadKey(key, fallback){
   try{ const r = await window.storage.get(key); return r ? JSON.parse(r.value) : fallback; }
@@ -639,7 +664,7 @@ function renderHeader(){
   document.getElementById('todayLabel').textContent = d.toLocaleDateString('pt-BR',{weekday:'long', day:'numeric', month:'long'});
   const strip=document.getElementById('weekstrip'); strip.innerHTML='';
   const names=['dom','seg','ter','qua','qui','sex','sáb'];
-  for(let i=0;i>=-6;i--){
+  for(let i=-6;i<=0;i++){
     const iso=isoOffset(i); const dt=new Date(iso+'T12:00:00');
     const dd=state.days[iso];
     const logged = dd && (dd.water>0 || dd.meals.length || dd.activities.length || dd.sleep.hours!=null);
@@ -688,6 +713,24 @@ function addActivity(){
   document.getElementById('actName').value=''; document.getElementById('actMin').value='';
   persist('days'); renderToday(); renderHeader();
 }
+function addSymptom(){
+  const desc=document.getElementById('sympDesc').value.trim();
+  if(!desc) return toast('Descreva o sintoma');
+  day(todayISO()).symptoms.push({id:uid(), desc, time:new Date().toTimeString().slice(0,5)});
+  document.getElementById('sympDesc').value='';
+  persist('days'); renderToday(); renderHeader();
+  toast('Sintoma registrado');
+}
+function removeSymptom(id){ removeFrom(day(todayISO()).symptoms,id,'days'); renderToday(); }
+function addMealDiario(){
+  const desc=document.getElementById('mealDescDiario').value.trim();
+  const type=document.getElementById('mealTypeDiario').value;
+  if(!desc) return toast('Descreva a refeição');
+  day(todayISO()).meals.push({id:uid(), type, desc, time:new Date().toTimeString().slice(0,5)});
+  document.getElementById('mealDescDiario').value='';
+  persist('days'); renderToday(); renderHeader(); renderDiario();
+  toast('Refeição registrada');
+}
 function saveSleep(){
   const h=parseFloat(document.getElementById('sleepH').value);
   if(isNaN(h)) return toast('Informe as horas de sono');
@@ -712,6 +755,12 @@ function renderToday(){
   al.innerHTML = d.activities.length? d.activities.map(a=>`
     <div class="list-item"><div class="grow">${a.name} <span class="muted">· ${a.min} min</span></div>
     <button class="del" onclick="removeAct('${a.id}')" aria-label="Excluir">✕</button></div>`).join('') : '<div class="empty">Nenhuma atividade registrada hoje.</div>';
+
+  const sl=document.getElementById('sympList');
+  sl.innerHTML = d.symptoms.length? d.symptoms.map(s=>`
+    <div class="list-item"><div class="grow">${s.desc} <span class="muted">· ${s.time}</span></div>
+    <button class="del" onclick="removeSymptom('${s.id}')" aria-label="Excluir">✕</button></div>`).join('') : '<div class="empty">Nenhum sintoma registrado hoje.</div>';
+
 
   document.getElementById('sleepH').value = d.sleep.hours ?? '';
   document.getElementById('sleepInfo').textContent = d.sleep.hours!=null ? `Registrado: ${d.sleep.hours}h${d.sleep.quality? ' · '+d.sleep.quality:''}` : '';
@@ -961,9 +1010,9 @@ function renderDiario(){
   const el=document.getElementById('diarioList');
   const isos = Object.keys(state.days).filter(iso=>{
     const d=state.days[iso];
-    return (d.meals && d.meals.length) || (d.activities && d.activities.length);
+    return (d.meals && d.meals.length) || (d.activities && d.activities.length) || (d.symptoms && d.symptoms.length);
   }).sort().reverse();
-  if(!isos.length){ el.innerHTML='<div class="empty">Nenhuma refeição ou atividade registrada ainda.</div>'; return; }
+  if(!isos.length){ el.innerHTML='<div class="empty">Nenhuma refeição, atividade ou sintoma registrado ainda.</div>'; return; }
   el.innerHTML = isos.map(iso=>{
     const d=state.days[iso];
     const mealsHTML = d.meals.length? d.meals.map(m=>`
@@ -972,12 +1021,17 @@ function renderDiario(){
     const actHTML = d.activities.length? d.activities.map(a=>`
       <div class="list-item"><div class="grow">${a.name} <span class="muted">· ${a.min} min</span></div></div>`).join('')
       : '<div class="empty">Sem atividades registradas.</div>';
+    const sympHTML = (d.symptoms&&d.symptoms.length)? d.symptoms.map(s=>`
+      <div class="list-item"><div class="grow">${s.desc} <span class="muted">· ${s.time}</span></div></div>`).join('')
+      : '<div class="empty">Sem sintomas registrados.</div>';
     return `<div class="day-group">
       <h3>${iso===todayISO()?'hoje · ':''}${weekdayName(iso)} · ${fmtBR(iso)}</h3>
       <div class="muted" style="margin:6px 0 2px; font-weight:700">🍽️ Refeições</div>
       ${mealsHTML}
       <div class="muted" style="margin:10px 0 2px; font-weight:700">🏃‍♀️ Atividade física</div>
       ${actHTML}
+      <div class="muted" style="margin:10px 0 2px; font-weight:700">💊 Sintomas</div>
+      ${sympHTML}
     </div>`;
   }).join('');
 }
