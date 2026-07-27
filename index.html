@@ -353,6 +353,22 @@
     </div>
   </section>
 
+  <!-- ===== ANOTAÇÕES ===== -->
+  <section class="tabpage" id="page-notas">
+    <div class="card">
+      <h2><span class="chip-ic" style="background:var(--lav-soft)">📝</span> Nova anotação</h2>
+      <textarea id="noteText" placeholder="Pensamentos, sensações, o que quiser registrar..." style="width:100%; min-height:100px; margin-top:8px; padding:10px; border-radius:12px; border:1.5px solid var(--line); font:inherit; resize:vertical"></textarea>
+      <div class="inline-form">
+        <button class="btn" onclick="addNote()">Salvar anotação</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Histórico</h2>
+      <div class="muted" style="margin-bottom:6px">Do mais recente ao mais antigo.</div>
+      <div id="notesList"></div>
+    </div>
+  </section>
+
   <!-- ===== GASTOS ===== -->
   <section class="tabpage" id="page-gastos">
     <div class="card">
@@ -459,7 +475,8 @@
   <button class="on" data-page="hoje" onclick="go('hoje',this)"><span class="ic">🌿</span>Hoje</button>
   <button data-page="agenda" onclick="go('agenda',this)"><span class="ic">📅</span>Agenda</button>
   <button data-page="tarefas" onclick="go('tarefas',this)"><span class="ic">✅</span>Tarefas</button>
-  <button data-page="diario" onclick="go('diario',this)"><span class="ic">📖</span>Diário</button>
+  <button data-page="diario" onclick="go('diario',this)"><span class="ic">📖</span>Diário Alimentar</button>
+  <button data-page="notas" onclick="go('notas',this)"><span class="ic">📝</span>Anotações</button>
   <button data-page="gastos" onclick="go('gastos',this)"><span class="ic">💰</span>Gastos</button>
   <button data-page="ciclo" onclick="go('ciclo',this)"><span class="ic">🌸</span>Ciclo</button>
   <button data-page="medidas" onclick="go('medidas',this)"><span class="ic">⚖️</span>Medidas</button>
@@ -531,6 +548,7 @@ function applyRemoteChange(key, value){
     else if(part==='measures'){ state.measures=parsed; renderMeasures(); }
     else if(part==='expenses'){ state.expenses=parsed; if(document.getElementById('page-gastos').classList.contains('active')) renderGastos(); if(document.getElementById('page-relatorio').classList.contains('active')) renderReport(); }
     else if(part==='expenseCategories'){ state.expenseCategories=parsed; renderExpenseCategorySelect(); renderExpenseCategoryManage(); }
+    else if(part==='notes'){ state.notes=parsed; if(document.getElementById('page-notas').classList.contains('active')) renderNotes(); }
   }catch(e){ console.error('Falha ao aplicar atualização remota', e); }
 }
 function subscribeRealtime(){
@@ -575,7 +593,7 @@ function defaultExpenseCategories(){
 let state = {
   tags: defaultTags(),
   expenseCategories: defaultExpenseCategories(),
-  tasks: [], events: [], measures: [], expenses: [], days: {}
+  tasks: [], events: [], measures: [], expenses: [], notes: [], days: {}
 };
 let selTaskTag=null, selAgTag=null, selColorAg=PALETTE[0], selColorTk=PALETTE[0], selExpType='Variável';
 
@@ -604,7 +622,28 @@ async function loadAll(){
   state.events   = await loadKey(pkey('events'), []);
   state.measures = await loadKey(pkey('measures'), []);
   state.expenses = await loadKey(pkey('expenses'), []);
+  state.notes    = await loadKey(pkey('notes'), []);
   state.days     = await loadKey(pkey('days'), {});
+}
+async function tryGetRaw(key){
+  try{ const r = await window.storage.get(key); return r ? r.value : null; }
+  catch(e){ return null; }
+}
+// Recupera dados salvos antes da criação de perfis (chaves sem prefixo de perfil).
+// Só roda para o perfil "mari" e só copia uma chave se ela ainda não existir no novo formato,
+// então é seguro chamar sempre — nunca sobrescreve dados novos.
+async function migrateLegacyIfNeeded(){
+  if(currentProfile!=='mari') return;
+  const parts = ['tags','expenseCategories','tasks','events','measures','expenses','days'];
+  for(const part of parts){
+    const already = await tryGetRaw(pkey(part));
+    if(already) continue;
+    const legacy = await tryGetRaw('ritmo:'+part);
+    if(legacy){
+      try{ await window.storage.set(pkey(part), legacy); }
+      catch(e){ console.error('Falha ao migrar', part, e); }
+    }
+  }
 }
 let saveTimer=null;
 function persist(part){
@@ -618,6 +657,7 @@ function persist(part){
       if(part==='measures'||!part) await window.storage.set(pkey('measures'), JSON.stringify(state.measures));
       if(part==='expenses'||!part) await window.storage.set(pkey('expenses'), JSON.stringify(state.expenses));
       if(part==='expenseCategories'||!part) await window.storage.set(pkey('expenseCategories'), JSON.stringify(state.expenseCategories));
+      if(part==='notes'||!part)    await window.storage.set(pkey('notes'), JSON.stringify(state.notes));
     }catch(e){ console.error('Falha ao salvar', e); toast('Não foi possível salvar agora'); }
   }, 300);
 }
@@ -634,6 +674,7 @@ function go(page, btn){
   if(page==='agenda') renderAgenda();
   if(page==='diario') renderDiario();
   if(page==='gastos') renderGastos();
+  if(page==='notas') renderNotes();
   if(page==='ciclo') renderCycleCalendar();
 }
 
@@ -653,6 +694,7 @@ async function switchProfile(p){
   if(activePage==='agenda') renderAgenda();
   if(activePage==='diario') renderDiario();
   if(activePage==='gastos') renderGastos();
+  if(activePage==='notas') renderNotes();
   if(activePage==='ciclo') renderCycleCalendar();
   pingCloud();
   toast(`Perfil: ${p==='mari'?'Mari':'Sarah'}`);
@@ -664,7 +706,7 @@ function renderHeader(){
   document.getElementById('todayLabel').textContent = d.toLocaleDateString('pt-BR',{weekday:'long', day:'numeric', month:'long'});
   const strip=document.getElementById('weekstrip'); strip.innerHTML='';
   const names=['dom','seg','ter','qua','qui','sex','sáb'];
-  for(let i=-6;i<=0;i++){
+  for(let i=0;i<=6;i++){
     const iso=isoOffset(i); const dt=new Date(iso+'T12:00:00');
     const dd=state.days[iso];
     const logged = dd && (dd.water>0 || dd.meals.length || dd.activities.length || dd.sleep.hours!=null);
@@ -1130,6 +1172,26 @@ function renderGastos(){
     : '<div class="empty">Nenhum gasto registrado ainda.</div>';
 }
 
+/* ================= Anotações ================= */
+function addNote(){
+  const text=document.getElementById('noteText').value.trim();
+  if(!text) return toast('Escreva algo para salvar');
+  state.notes.push({id:uid(), date:todayISO(), time:new Date().toTimeString().slice(0,5), text});
+  document.getElementById('noteText').value='';
+  persist('notes'); renderNotes();
+  toast('Anotação salva');
+}
+function deleteNote(id){ state.notes=state.notes.filter(n=>n.id!==id); persist('notes'); renderNotes(); }
+function renderNotes(){
+  const el=document.getElementById('notesList'); if(!el) return;
+  const sorted=state.notes.slice().sort((a,b)=> (b.date+b.time).localeCompare(a.date+a.time));
+  el.innerHTML = sorted.length? sorted.map(n=>`
+    <div class="list-item"><div class="grow">
+      <span class="muted">${fmtBR(n.date)} · ${n.time}</span><br>${n.text.replace(/\n/g,'<br>')}
+    </div><button class="del" onclick="deleteNote('${n.id}')" aria-label="Excluir">✕</button></div>`).join('')
+    : '<div class="empty">Nenhuma anotação ainda.</div>';
+}
+
 /* ================= Relatório ================= */
 function weekData(){
   const days=[]; for(let i=-6;i<=0;i++){ const iso=isoOffset(i); days.push({iso, d: state.days[iso]||emptyDay()}); }
@@ -1255,6 +1317,7 @@ function downloadPDF(){
 /* ================= Inicialização ================= */
 (async function init(){
   setCloudStatus('connecting');
+  await migrateLegacyIfNeeded();
   await loadAll();
   document.getElementById('evDate').value=todayISO();
   renderHeader(); renderToday(); renderTagPickers(); renderColorPicks();
